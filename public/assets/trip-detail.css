@@ -38,7 +38,7 @@ body[data-page="trip"] { --forest: #071e19; --champagne: #c9aa70; --subnav-top: 
 .td-subnav-cta { display: flex; align-items: center; gap: 18px; flex: none; font-size: 13px; color: var(--muted); }
 .td-subnav-cta b { font-family: var(--display); font-size: 20px; color: var(--ink); letter-spacing: -.02em; }
 
-.td-overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: clamp(40px, 6vw, 96px); align-items: start; }
+.td-overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 460px; gap: clamp(32px, 4.5vw, 72px); align-items: start; }
 .td-overview-main .h2 { margin: 20px 0 28px; }
 .td-overview-main .h2 em { color: var(--red); }
 .td-overview-main > p:not(.lead) { color: var(--muted); font-size: var(--fs-body); line-height: 1.8; margin-top: 18px; max-width: 680px; }
@@ -205,7 +205,7 @@ body[data-page="trip"] { --forest: #071e19; --champagne: #c9aa70; --subnav-top: 
 .td-lb-nav.next { right: -64px; }
 
 @media (max-width: 1180px) {
-  .td-overview-grid { grid-template-columns: minmax(0, 1fr) 340px; }
+  .td-overview-grid { grid-template-columns: minmax(0, 1fr) 400px; }
   .td-hoods-grid { grid-template-columns: 1fr 1fr; }
   .td-panel-dark { grid-column: 1 / -1; }
   .td-people { display: grid; grid-template-columns: 1fr 1fr; column-gap: 30px; }
@@ -216,7 +216,7 @@ body[data-page="trip"] { --forest: #071e19; --champagne: #c9aa70; --subnav-top: 
   .td-subnav-cta { display: none; }
   .td-overview-grid { grid-template-columns: 1fr; }
   .td-book { position: static; }
-  .td-book-card { max-width: 560px; }
+  .td-book-card { max-width: 640px; }
   .td-day, .td-day:nth-child(even) { grid-template-columns: 1fr; }
   .td-day:nth-child(even) .td-day-media { order: 0; }
   .td-day-media { aspect-ratio: 16 / 9; }
@@ -284,3 +284,15 @@ body[data-page="trip"] { --forest: #071e19; --champagne: #c9aa70; --subnav-top: 
   .td-shot img, .td-addon img { transition: none; }
   .td-mobar { transition: none; }
 }
+
+/* Booking card: route visual (Tour starts — duration — Tour ends) */
+.td-route { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 22px; padding: 16px 18px; border-radius: var(--r); background: var(--cream); }
+.td-route-city { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.td-route-city.end { text-align: right; }
+.td-route-city b { font-size: 15px; font-weight: 700; line-height: 1.25; }
+.td-route-city small { font-size: 12px; color: var(--muted); }
+.td-route-line { position: relative; flex: 1; display: flex; justify-content: center; align-items: center; min-width: 90px; }
+.td-route-line::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed var(--line); }
+.td-route-line span { position: relative; padding: 0 10px; background: var(--cream); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.td-book-list { margin-top: 18px; }
+@media (max-width: 560px) { .td-route { flex-direction: column; align-items: stretch; text-align: center; gap: 10px; } .td-route-city.end { text-align: center; } .td-route-line { min-height: 28px; } }

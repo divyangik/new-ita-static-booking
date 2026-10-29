@@ -30,10 +30,13 @@
     openButton.setAttribute('aria-haspopup', 'dialog');
     openButton.setAttribute('aria-controls', dialogId);
     openButton.innerHTML = 'Reserve with a deposit <span class="arr">→</span>';
-    const sampleNote = document.createElement('p');
-    sampleNote.className = 'bb-mount-note';
-    sampleNote.textContent = options.isSample ? 'Sample booking mode · no payment is taken' : 'You pay the deposit on Shopify’s secure checkout page.';
-    mount.append(openButton, sampleNote);
+    mount.append(openButton);
+    if (options.isSample) {
+      const sampleNote = document.createElement('p');
+      sampleNote.className = 'bb-mount-note';
+      sampleNote.textContent = 'Sample booking mode · no payment is taken';
+      mount.append(sampleNote);
+    }
 
     const dialog = document.createElement('dialog');
     dialog.className = 'bb-dialog';
@@ -82,7 +85,7 @@
         <h4 class="bb-step-title" tabindex="-1">Journey details</h4>
         ${dateField}
         <div class="bb-group">
-          <div class="bb-row"><span id="${dialogId}-travelers-label">Travelers<small>${money(options.depositPerTraveler, options.currency)} deposit per traveler</small></span>
+          <div class="bb-row"><span class="bb-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2"/></svg></span><span class="bb-row-text" id="${dialogId}-travelers-label"><strong>Travelers</strong><small>${money(options.depositPerTraveler, options.currency)} deposit per traveler</small></span>
           <div class="bb-step" role="group" aria-labelledby="${dialogId}-travelers-label">
             <button type="button" data-delta="-1" aria-label="Fewer travelers">−</button>
             <output aria-live="polite" data-travelers>${state.travelers}</output>
@@ -96,9 +99,11 @@
           <label class="bb-field"><span>Email</span><input name="email" type="email" inputmode="email" autocomplete="email" value="${escapeHtml(state.email)}" required ${invalidAttributes('email')}>${fieldError('email')}</label>
           <label class="bb-field"><span>Phone / WhatsApp</span><input name="phone" type="tel" autocomplete="tel" placeholder="+1 555 010 0000" value="${escapeHtml(state.phone)}" required ${invalidAttributes('phone')}>${fieldError('phone')}</label>
         </div>
-        <div class="bb-summary" aria-live="polite">
-          <div class="bb-total due"><span>Deposit due now</span><b data-due>${money(depositDue(), options.currency)}</b></div>
-          <p class="bb-hint">The remaining balance is arranged with your ITA Global specialist.</p>
+        <div class="bb-pay" aria-live="polite">
+          <div class="bb-pay-opt is-selected">
+            <div><strong>Reserve with a deposit</strong><small>The remaining balance is arranged with your ITA Global specialist.</small></div>
+            <b data-due>${money(depositDue(), options.currency)}</b>
+          </div>
         </div>
         <div class="bb-actions"><button type="submit" class="btn bb-primary">Review reservation <span class="arr">→</span></button></div>
       </form>`;
@@ -289,6 +294,7 @@
     });
 
     openButton.addEventListener('click', openDialog);
+    document.querySelectorAll('[data-open-booking]').forEach(link => link.addEventListener('click', event => { event.preventDefault(); openDialog(); }));
 
     window.addEventListener('pageshow', event => {
       if (!event.persisted || !state.busy) return;

@@ -21,7 +21,7 @@
 
   const mobar = select('.td-mobar');
   const hero = select('.td-hero');
-  const reserve = select('#inquiry');
+  const reserve = select('.td-book-card');
   let mobarObserver;
   if (mobar && hero && reserve) {
     const state = { hero: true, reserve: false };

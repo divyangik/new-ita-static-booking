@@ -1,11 +1,11 @@
 .bb-open { width: 100%; justify-content: center; margin-bottom: 6px; }
 .bb-mount-note { margin: 0 0 12px; font-size: 12px; color: var(--muted); text-align: center; }
 .bb-lock { overflow: hidden; }
-.bb-dialog { border: 0; padding: 0; margin: auto; inset: 0; border-radius: var(--r-lg); width: min(560px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); background: #fff; color: var(--ink); box-shadow: 0 40px 100px -30px rgba(7, 12, 43, .6); overflow: hidden; }
+.bb-dialog { border: 0; padding: 0; margin: auto; inset: 0; border-radius: var(--r-lg); width: min(680px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); background: #fff; color: var(--ink); box-shadow: 0 40px 100px -30px rgba(7, 12, 43, .6); overflow: hidden; }
 .bb-dialog[open] { display: flex; flex-direction: column; }
 .bb-dialog::backdrop { background: rgba(7, 12, 43, .62); backdrop-filter: blur(4px); }
 .bb-shell { display: flex; flex-direction: column; min-height: 0; max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; font-family: var(--sans); }
-.bb-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 22px 28px 16px; background: #fff; border-bottom: 1px solid var(--line); }
+.bb-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 24px 32px 18px; background: #fff; border-bottom: 1px solid var(--line); }
 .bb-head small { font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .bb-head h3 { font-family: var(--display); font-size: 22px; line-height: 1.2; font-weight: 500; letter-spacing: -.02em; margin-top: 6px; }
 .bb-x { background: none; border: 1px solid var(--line); border-radius: 50%; width: 40px; height: 40px; flex: none; cursor: pointer; color: var(--ink); font-size: 14px; }
@@ -19,7 +19,7 @@
 .bb-steps li.is-current span { background: var(--red); color: #fff; }
 .bb-steps li.is-done { border-color: var(--ink); color: var(--ink); }
 .bb-steps li.is-done span { background: var(--ink); color: #fff; }
-.bb-body { padding: 6px 28px 24px; }
+.bb-body { padding: 6px 32px 28px; }
 .bb-step-title { margin-top: 16px; font-family: var(--display); font-size: 18px; font-weight: 600; letter-spacing: -.01em; outline: none; }
 .bb-group { margin-top: 20px; }
 .bb-group h4 { font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
@@ -75,6 +75,7 @@
   .bb-head { padding: 16px 18px 12px; }
   .bb-head h3 { font-size: 18px; }
   .bb-sample, .bb-steps { margin-left: 18px; margin-right: 18px; }
+  .bb-sample { margin-top: 12px; }
   .bb-body { padding: 4px 18px 20px; }
   .bb-steps li { font-size: 11px; gap: 6px; }
   .bb-review div { grid-template-columns: 1fr; gap: 2px; }
@@ -83,3 +84,18 @@
 }
 @media (prefers-reduced-motion: reduce) { .bb-spinner { animation-duration: 2.4s; } }
 .bb-hint[data-status]:focus { outline: none; }
+
+/* Widget-style rows + payment option card */
+.bb-row { padding: 14px 16px; margin-top: 6px; border: 1px solid var(--line); border-radius: 12px; justify-content: flex-start; }
+.bb-row .bb-step { margin-left: auto; }
+.bb-ico { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 50%; background: var(--cream); color: var(--ink); }
+.bb-ico svg { width: 22px; height: 22px; }
+.bb-row-text { display: flex; flex-direction: column; gap: 2px; }
+.bb-row-text strong { font-size: 15px; font-weight: 700; }
+.bb-pay { margin-top: 22px; }
+.bb-pay-opt { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 18px; border: 2px solid var(--line); border-radius: 12px; background: #fff; }
+.bb-pay-opt.is-selected { border-color: var(--ink); }
+.bb-pay-opt strong { display: block; font-size: 15px; font-weight: 700; }
+.bb-pay-opt small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.bb-pay-opt b { font-family: var(--display); font-size: 24px; font-weight: 600; flex: none; }
+@media (max-width: 560px) { .bb-row { padding: 12px; } .bb-body { padding: 4px 18px 20px; } }
