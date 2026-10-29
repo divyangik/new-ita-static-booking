@@ -9,14 +9,20 @@
   const steps = [['details', 'Details'], ['review', 'Review'], ['done', 'Confirmation']];
   let dialogCount = 0;
 
-  const init = mount => {
-    const options = services.booking.readBookingOptions(mount);
-    if (!(options.depositPerTraveler > 0)) return;
+  const init = async mount => {
+    let options;
+    try {
+      options = await services.booking.loadBookingOptions(mount);
+    } catch (loadError) {
+      console.warn('ITA booking is not available right now.', loadError);
+      return;
+    }
+    if (!options || !(options.depositPerTraveler > 0)) return;
     const dialogId = `bb-dialog-${++dialogCount}`;
 
     const blankState = () => ({ step: 'details', startDate: '', travelers: 2, name: '', email: '', phone: '', policyAccepted: false, errors: {}, submitError: '', result: null, busy: false });
     let state = blankState();
-    state.travelers = Math.min(2, options.maxTravelers);
+    state.travelers = Math.max(options.minTravelers, Math.min(2, options.maxTravelers));
 
     const openButton = document.createElement('button');
     openButton.type = 'button';
@@ -26,7 +32,7 @@
     openButton.innerHTML = 'Reserve with a deposit <span class="arr">→</span>';
     const sampleNote = document.createElement('p');
     sampleNote.className = 'bb-mount-note';
-    sampleNote.textContent = 'Sample booking mode · no payment is taken';
+    sampleNote.textContent = options.isSample ? 'Sample booking mode · no payment is taken' : 'You pay the deposit on Shopify’s secure checkout page.';
     mount.append(openButton, sampleNote);
 
     const dialog = document.createElement('dialog');
@@ -38,7 +44,7 @@
         <div><small>Reserve with a deposit</small><h3 id="${dialogId}-title">${escapeHtml(options.tripTitle)}</h3></div>
         <button type="button" class="bb-x" data-close aria-label="Close">✕</button>
       </header>
-      <p class="bb-sample" role="note"><b>Sample mode</b> No payment is taken and no booking is created. Shopify checkout will be connected in a later phase.</p>
+      ${options.isSample ? '<p class="bb-sample" role="note"><b>Sample mode</b> No payment is taken and no booking is created.</p>' : ''}
       <ol class="bb-steps" aria-label="Booking progress"></ol>
       <div class="bb-body"></div>
     </div>`;
@@ -119,9 +125,9 @@
       ${state.submitError ? `<div class="bb-alert" role="alert"><b>Reservation not completed.</b> ${escapeHtml(state.submitError)} Your details are kept, so you can try again.</div>` : ''}
       <div class="bb-actions split">
         <button type="button" class="btn ghost bb-secondary" data-go="details" ${state.busy ? 'disabled' : ''}>Back</button>
-        <button type="submit" class="btn bb-primary" ${state.busy ? 'disabled aria-busy="true"' : ''}>${state.busy ? '<span class="bb-spinner" aria-hidden="true"></span>Confirming…' : (state.submitError ? 'Try again' : `Confirm sample deposit · ${money(depositDue(), options.currency)}`)}</button>
+        <button type="submit" class="btn bb-primary" ${state.busy ? 'disabled aria-busy="true"' : ''}>${state.busy ? '<span class="bb-spinner" aria-hidden="true"></span>Please wait…' : (state.submitError ? 'Try again' : `${options.isSample ? 'Confirm sample deposit' : 'Continue to secure payment'} · ${money(depositDue(), options.currency)}`)}</button>
       </div>
-      <p class="bb-hint center" aria-live="polite" data-status tabindex="-1">${state.busy ? 'Confirming your sample reservation…' : 'Sample mode: confirming does not charge you or create a booking.'}</p>
+      <p class="bb-hint center" aria-live="polite" data-status tabindex="-1">${state.busy ? (options.isSample ? 'Confirming your sample reservation…' : 'Taking you to Shopify’s secure payment page…') : (options.isSample ? 'Sample mode: confirming does not charge you or create a booking.' : 'You will review and pay your deposit on the next page.')}</p>
     </form>`;
 
     const doneMarkup = () => {
@@ -192,6 +198,10 @@
       render('[data-status]');
       try {
         state.result = await services.booking.createDepositReservation(request());
+        if (state.result.redirectUrl) {
+          window.location.assign(state.result.redirectUrl);
+          return;
+        }
         state.busy = false;
         state.step = 'done';
         render();
@@ -279,6 +289,12 @@
     });
 
     openButton.addEventListener('click', openDialog);
+
+    window.addEventListener('pageshow', event => {
+      if (!event.persisted || !state.busy) return;
+      state.busy = false;
+      if (dialog.open) render();
+    });
   };
 
   mounts.forEach(init);

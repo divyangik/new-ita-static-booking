@@ -1,6 +1,10 @@
 (() => {
+  const apiBasePlaceholder = 'https://REPLACE-WITH-YOUR-ADMIN-APP-URL';
+  const requestedMode = new URLSearchParams(location.search).get('mode');
+
   const config = Object.freeze({
-    dataMode: 'mock'
+    dataMode: requestedMode === 'mock' ? 'mock' : 'shopify',
+    apiBase: 'http://localhost:63145'
   });
 
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -29,7 +33,12 @@
       fixedDepartures: (dataset.dates || '').split(',').map(date => date.trim()).filter(Boolean),
       earliestStart,
       latestStart: addDaysIso(earliestStart, 730),
-      commerce: { store: (dataset.store || '').trim(), variantId: (dataset.variant || '').trim() }
+      isSample: true,
+      commerce: {
+        store: (dataset.store || '').trim(),
+        variantId: (dataset.variant || '').trim(),
+        productId: (dataset.productId || '').trim()
+      }
     };
   };
 
@@ -44,9 +53,22 @@
     return errors;
   };
 
+  const isApiConfigured = () => config.apiBase && config.apiBase !== apiBasePlaceholder;
+
   const adapters = {
     mock: {
+      loadBookingOptions: async baseOptions => baseOptions,
       createDepositReservation: request => window.ITAMock.booking.createDepositReservation(request)
+    },
+    shopify: {
+      loadBookingOptions: async baseOptions => {
+        if (!isApiConfigured()) {
+          console.warn('ITA booking: set config.apiBase in assets/services/ita-services.js');
+          return null;
+        }
+        return window.ITAShopify.booking.loadOptions(baseOptions, config.apiBase);
+      },
+      createDepositReservation: request => window.ITAShopify.booking.createDepositReservation(request, config.apiBase)
     }
   };
 
@@ -60,6 +82,7 @@
     config,
     booking: Object.freeze({
       readBookingOptions,
+      loadBookingOptions: mount => activeAdapter().loadBookingOptions(readBookingOptions(mount)),
       validateDepositRequest,
       createDepositReservation: request => activeAdapter().createDepositReservation(request)
     })
