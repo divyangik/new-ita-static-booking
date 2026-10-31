@@ -1,7 +1,8 @@
 // Talks to the ITA admin app (ita-package-manager). One place for the web address.
 (() => {
-  // 1) Paste your live admin app URL here (no slash at the end), e.g. https://ita-package-manager.onrender.com
-  const liveApiBase = 'https://REPLACE-WITH-YOUR-ADMIN-APP-URL';
+  // 1) Live admin app URL (no slash at the end). For the demo this is the temporary link from `shopify app dev`.
+  //    It changes every time `shopify app dev` is restarted. Later use your Render URL here.
+  const liveApiBase = 'https://meaningful-army-monitors-reforms.trycloudflare.com';
   // 2) On your own computer this fixed port is used (see vite.config.js in the admin app).
   const localApiBase = 'http://localhost:3100';
 
