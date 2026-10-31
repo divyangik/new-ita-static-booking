@@ -1,306 +1,607 @@
+// ITA trip booking widget. Everything shown here comes from the ITA admin app.
 (() => {
   const mounts = [...document.querySelectorAll('[data-ita-booking]')];
-  const services = window.ITAServices;
-  if (!mounts.length || !services) return;
+  const api = window.ITAServices && window.ITAServices.api;
+  if (!mounts.length || !api) return;
 
-  const money = (value, currency) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);
-  const escapeHtml = text => String(text ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
-  const longDate = iso => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  const steps = [['details', 'Details'], ['review', 'Review'], ['done', 'Confirmation']];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = value => Number(value) || 0;
+  const money = (value, currency = 'USD') => {
+    const whole = Math.abs(value - Math.round(value)) < 0.005;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }).format(value);
+  };
+  const dmy = iso => { const [y, m, d] = String(iso).split('-'); return `${Number(d)}-${MONTHS[Number(m) - 1]}-${y}`; };
+  const dayDiff = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 864e5);
+  const isoToday = () => { const now = new Date(); return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const isoTomorrow = () => { const d = new Date(isoToday() + 'T12:00:00'); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); };
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const phonePattern = /^[+()\-.\s\d]{7,20}$/;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  const icons = {
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg>',
+    room: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V7"/><path d="M3 14h18v4"/><path d="M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.6"/></svg>',
+    child: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="9" r="2.8"/><path d="M7 20c0-3 2.2-4.6 5-4.6s5 1.6 5 4.6"/></svg>',
+    extra: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.2 5.6.7-4.1 3.9 1.1 5.6L12 15.6 7 18.4l1.1-5.6L4 8.9l5.6-.7z"/></svg>',
+    moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>'
+  };
+
+  const svg = body => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+  const iconLibrary = {
+    spa: svg('<path d="M5 19c0-8 5-13 14-14 0 9-5 14-14 14z"/><path d="M5 19c3-5 6-8 10-10"/>'),
+    paw: svg('<circle cx="6.5" cy="10" r="1.7"/><circle cx="10" cy="6" r="1.7"/><circle cx="14" cy="6" r="1.7"/><circle cx="17.5" cy="10" r="1.7"/><path d="M8 17c0-2.5 2-4.5 4-4.5s4 2 4 4.5c0 1.7-1.5 2.5-4 2.5s-4-.8-4-2.5z"/>'),
+    moon: icons.moon,
+    car: svg('<path d="M4 15v-3l2-5h12l2 5v3"/><path d="M3 15h18v3H3z"/><circle cx="7.5" cy="18" r="1.2"/><circle cx="16.5" cy="18" r="1.2"/>'),
+    food: svg('<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10"/><path d="M17 3c-2 2-3 5-3 8h3v10"/>'),
+    wine: svg('<path d="M8 3h8l-.5 6a3.5 3.5 0 0 1-7 0z"/><path d="M12 12.5V20M8.5 20h7"/>'),
+    compass: svg('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'),
+    plane: svg('<path d="M3 13l18-7-5 14-3.5-5.5z"/><path d="M12.5 14.5 21 6"/>'),
+    shield: svg('<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="m9 12 2 2 4-4"/>'),
+    camera: svg('<path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.2"/>'),
+    bike: svg('<circle cx="6" cy="16" r="3.5"/><circle cx="18" cy="16" r="3.5"/><path d="M6 16l4-8h5l3 8M10 8l3 8"/>'),
+    snow: svg('<path d="M12 3v18M4 7.5l16 9M20 7.5l-16 9"/>'),
+    flag: svg('<path d="M6 21V4M6 5l11 3-11 4"/>'),
+    wifi: svg('<path d="M3 9c5.5-5 12.5-5 18 0M6 12.5c3.5-3 8.5-3 12 0M9.2 16c1.7-1.4 3.9-1.4 5.6 0"/><circle cx="12" cy="19" r=".8"/>'),
+    gift: svg('<rect x="4" y="9" width="16" height="11" rx="1"/><path d="M12 9v11M4 13h16M12 9c-3-4-6-2-4.5 0M12 9c3-4 6-2 4.5 0"/>'),
+    boat: svg('<path d="M4 15l2 4h12l2-4z"/><path d="M12 3v12M12 4l6 8h-6"/>'),
+    crown: svg('<path d="M4 8l4 4 4-7 4 7 4-4-2 10H6z"/>'),
+    book: svg('<path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M8 17h10"/>'),
+    heart: svg('<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>'),
+    sparkle: svg('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>')
+  };
+  // A different icon and soft color for each extra, chosen from its name
+  const iconRules = [
+    [/spa|massage|wellness|relax|sauna/i, 'spa'], [/pet|dog|cat|animal/i, 'paw'], [/night|hotel|stay|room|lodging/i, 'moon'],
+    [/transfer|airport|pick.?up|car|taxi|transport|shuttle|chauffeur/i, 'car'], [/meal|dinner|lunch|breakfast|food|dining|cuisine|cook/i, 'food'],
+    [/wine|drink|bar|cocktail|tasting|beer/i, 'wine'], [/guide|tour|excursion|experience|activity|trek|hike/i, 'compass'],
+    [/flight|fly|plane|air(?!port)/i, 'plane'], [/insur|protect|cover/i, 'shield'], [/photo|camera|video|film/i, 'camera'],
+    [/bike|cycl/i, 'bike'], [/ski|snow/i, 'snow'], [/golf/i, 'flag'], [/wi-?fi|sim|internet|data/i, 'wifi'],
+    [/gift|souvenir|welcome|hamper/i, 'gift'], [/boat|cruise|ferry|sail|yacht/i, 'boat'], [/upgrade|vip|premium|luxury|first.?class/i, 'crown'],
+    [/class|lesson|workshop|course|learn/i, 'book']
+  ];
+  const tones = [['#fdecee', '#c9606a'], ['#e8f1fb', '#3c78b5'], ['#e9f4e3', '#5a8a43'], ['#fbf1de', '#b27a1f'], ['#efeaf8', '#6a58a0'], ['#e4f3f1', '#2f8a80']];
+  const fallbackIcons = ['sparkle', 'gift', 'heart', 'crown'];
+  const extraLook = (name, position) => {
+    const rule = iconRules.find(([pattern]) => pattern.test(name));
+    const tone = tones[position % tones.length];
+    return { icon: iconLibrary[rule ? rule[1] : fallbackIcons[position % fallbackIcons.length]], bg: tone[0], fg: tone[1] };
+  };
+  const fieldIcons = {
+    user: icons.user,
+    mail: icons.mail,
+    phone: svg('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>'),
+    chat: svg('<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'),
+    calendar: svg('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
+    people: svg('<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.6c3 .1 5 1.9 5 5.4"/>'),
+    arrow: svg('<path d="M5 12h14M13 6l6 6-6 6"/>')
+  };
+  const heroImage = (() => {
+    const meta = document.querySelector('meta[property="og:image"]');
+    const el = document.querySelector('.td-hero-media img, .td-hero img');
+    const raw = (meta && meta.content) || (el && (el.currentSrc || el.src)) || '';
+    try { return raw ? new URL(raw, location.href).href : ''; } catch (urlError) { return ''; }
+  })();
+
   let dialogCount = 0;
 
+  // ---------- facts list under the price (Duration, destinations, hotels) ----------
+  const renderTripCard = (mount, trip) => {
+    const root = mount.closest('.td-book-card');
+    const card = trip && trip.card;
+    if (!root || !card) return;
+    const currency = card.currency || 'USD';
+
+    if (card.from_price) {
+      const top = root.querySelector('.td-book-top');
+      if (top) top.innerHTML = `<small>From</small><b>${money(card.from_price, currency)}</b><span>per person</span>`;
+      document.querySelectorAll('.td-subnav-cta b, .td-mobar b').forEach(el => { el.textContent = money(card.from_price, currency); });
+    }
+    const note = root.querySelector('.td-book-note');
+    if (note) {
+      note.textContent = card.price_note ? `*${card.price_note.replace(/^\*/, '')}` : '';
+      note.hidden = !card.price_note;
+    }
+    // The old fixed route box is replaced by the live route box inside the widget
+    root.querySelectorAll('.td-route').forEach(el => el.remove());
+
+    const cities = (trip.trip && trip.trip.cities) || [];
+    const rows = [];
+    if (cities.length) rows.push(['Destinations', cities.join(' · ')]);
+    else if (trip.trip && trip.trip.info.country) rows.push(['Destination', trip.trip.info.country]);
+    if (card.hotels_included) rows.push(['Hotels', 'Included']);
+    const list = root.querySelector('.td-book-list');
+    if (list) list.innerHTML = rows.map(([label, value]) => `<li data-fact="${esc(label.toLowerCase())}"><span>${esc(label)}</span><b>${esc(value)}</b></li>`).join('');
+  };
+
   const init = async mount => {
-    let options;
+    const productId = (mount.dataset.productId || '').trim();
+    if (!productId) return;
+
+    let trip;
     try {
-      options = await services.booking.loadBookingOptions(mount);
+      trip = await api.getTrip(productId);
     } catch (loadError) {
       console.warn('ITA booking is not available right now.', loadError);
       return;
     }
-    if (!options || !(options.depositPerTraveler > 0)) return;
-    const dialogId = `bb-dialog-${++dialogCount}`;
+    if (!trip || !trip.view || !trip.trip) return;
+    renderTripCard(mount, trip);
 
-    const blankState = () => ({ step: 'details', startDate: '', travelers: 2, name: '', email: '', phone: '', policyAccepted: false, errors: {}, submitError: '', result: null, busy: false });
-    let state = blankState();
-    state.travelers = Math.max(options.minTravelers, Math.min(2, options.maxTravelers));
+    // ---------- data from the admin app ----------
+    const T = trip.trip;
+    const currency = trip.currency || T.pricing.currency || 'USD';
+    const title = trip.title || mount.dataset.title || 'this journey';
+    const today = isoToday();
+    const openDates = (trip.dates || []).filter(d =>
+      ['Available', 'Guaranteed'].includes(d.status) && String(d.departure_date) > today && !(d.seats_total > 0 && d.seats_available <= 0));
+    const fixedMode = openDates.length > 0;
+    const minGuests = Math.max(1, num(T.capacity.min_group_size));
+    const maxGuests = num(T.capacity.max_group_size) > 0 ? num(T.capacity.max_group_size) : 20;
+    const addons = (trip.addons || []).filter(a => a.visible !== false);
+    const depositPer = num(T.payment.deposit_amount);
+    const installments = Math.max(1, num(T.payment.installments));
+    const startCity = T.info.start_city || T.info.departure_city || '';
+    const endCity = T.info.end_city || startCity;
+    const defaultDate = openDates.find(d => d.is_default) || openDates[0] || null;
 
-    const openButton = document.createElement('button');
-    openButton.type = 'button';
-    openButton.className = 'btn bb-open';
-    openButton.setAttribute('aria-haspopup', 'dialog');
-    openButton.setAttribute('aria-controls', dialogId);
-    openButton.innerHTML = 'Reserve with a deposit <span class="arr">→</span>';
-    mount.append(openButton);
-    if (options.isSample) {
-      const sampleNote = document.createElement('p');
-      sampleNote.className = 'bb-mount-note';
-      sampleNote.textContent = 'Sample booking mode · no payment is taken';
-      mount.append(sampleNote);
-    }
+    const state = {
+      dateId: defaultDate ? String(defaultDate.id) : '',
+      from: '', to: '',
+      counts: { adult: Math.min(minGuests, maxGuests), single: 0, child: 0 },
+      addons: {},
+      pay: depositPer > 0 && !T.payment.preselect_full_payment ? 'deposit' : 'full',
+      error: ''
+    };
 
+    const date = () => openDates.find(d => String(d.id) === state.dateId) || null;
+    const cleanLabel = text => (text && !/^(n\/?a|none|null|-+|—)$/i.test(String(text).trim()) ? String(text).trim() : '');
+    // "44 Days, 43 Nights", worked out from the chosen tour date. Without a date, the admin's duration is used.
+    const durationText = () => {
+      const d = date();
+      if (d) { const nights = dayDiff(d.departure_date, d.return_date); return `${plural(nights + 1, 'Day')}, ${plural(nights, 'Night')}`; }
+      return cleanLabel(T.info.duration_label) || (T.info.days ? `${plural(T.info.days, 'Day')}${T.info.nights ? `, ${plural(T.info.nights, 'Night')}` : ''}` : '');
+    };
+    const factsList = () => { const card = mount.closest('.td-book-card'); return card ? card.querySelector('.td-book-list') : null; };
+    const setDurationFact = text => {
+      const list = factsList();
+      if (!list) return;
+      let item = list.querySelector('[data-fact="duration"]');
+      if (!text) { if (item) item.remove(); return; }
+      if (!item) { item = document.createElement('li'); item.dataset.fact = 'duration'; item.innerHTML = '<span>Duration</span><b></b>'; list.prepend(item); }
+      item.querySelector('b').textContent = text;
+    };
+    const travelers = () => state.counts.adult + state.counts.single + state.counts.child;
+    const seatLimit = () => { const d = date(); return d && d.seats_total > 0 ? d.seats_available : Infinity; };
+    const guestCap = () => Math.min(maxGuests, seatLimit());
+    // The admin sets the maximum in the dashboard (Max quantity). 0 means no limit, up to a safety cap.
+    const addonMax = addon => (num(addon.max_qty) > 0 ? num(addon.max_qty) : 20);
+    const unitPrices = () => {
+      const d = date();
+      if (d) return { adult: num(d.adult_price), child: num(d.child_price) || num(d.adult_price), single: num(d.single_supplement) };
+      const p = num(T.pricing.price_per_person);
+      return { adult: p, child: p, single: 0 };
+    };
+    const estimate = () => {
+      const d = date();
+      if (!d) return null;
+      const u = unitPrices();
+      const c = state.counts;
+      let total = c.adult * u.adult + c.single * (u.adult + u.single) + c.child * u.child;
+      addons.forEach(a => { total += (state.addons[a.id] || 0) * num(a.price); });
+      const deposit = depositPer * travelers();
+      const due = state.pay === 'deposit' && deposit > 0 ? Math.min(deposit, total) : total;
+      const depositNow = deposit > 0 ? Math.min(deposit, total) : 0;
+      return { total, due, balance: total - due, depositNow, depositBalance: total - depositNow };
+    };
+    const travelerSummary = () => {
+      const c = state.counts;
+      const parts = [];
+      if (c.adult) parts.push(plural(c.adult, 'adult'));
+      if (c.single) parts.push(`${plural(c.single, 'adult')} in private ${c.single === 1 ? 'room' : 'rooms'}`);
+      if (c.child) parts.push(plural(c.child, 'child').replace('childs', 'children'));
+      return parts.join(', ');
+    };
+    const extrasSummary = () => addons.filter(a => state.addons[a.id] > 0).map(a => `${state.addons[a.id]} × ${a.addon_name}`).join(', ');
+    const buildPayload = contact => ({
+      shopify_product_id: productId,
+      date_id: date() ? date().id : null,
+      rows: ['adult', 'single', 'child'].filter(k => state.counts[k] > 0).map(k => ({ type: k, qty: state.counts[k] })),
+      addons: addons.filter(a => state.addons[a.id] > 0).map(a => ({ id: a.id, qty: state.addons[a.id] })),
+      payment_type: state.pay === 'full' ? 'full' : 'deposit',
+      contact
+    });
+
+    // ---------- the widget (inline in the page) ----------
+    const stepper = (label, attrs, count, canDown, canUp) => `
+      <div class="tw-step" role="group" aria-label="${esc(label)}">
+        <button type="button" ${attrs} data-d="-1" ${canDown ? '' : 'disabled'} aria-label="Fewer: ${esc(label)}">−</button>
+        <output aria-live="polite">${count}</output>
+        <button type="button" ${attrs} data-d="1" ${canUp ? '' : 'disabled'} aria-label="More: ${esc(label)}">+</button>
+      </div>`;
+
+    const row = ({ icon, tone, name, sub, price, step }) => `
+      <div class="tw-row">
+        <span class="tw-ico" ${tone ? `style="${tone}"` : ''}>${icon}</span>
+        <div class="tw-rt"><b>${esc(name)}</b><small>${esc(sub)}</small></div>
+        ${price ? `<span class="tw-rp">${esc(price)}</span>` : ''}
+        ${step}
+      </div>`;
+
+    const widgetView = () => {
+      const d = date();
+      const u = unitPrices();
+      const c = state.counts;
+      const n = travelers();
+      const cap = guestCap();
+      const est = estimate();
+      const duration = durationText();
+
+      const dateBlock = fixedMode ? `
+        <label class="tw-field"><span>Tour date</span>
+          <select name="dateId" data-fk="date">${openDates.map(x => `<option value="${x.id}" ${String(x.id) === state.dateId ? 'selected' : ''}>${dmy(x.departure_date)}${x.status === 'Guaranteed' ? ' · Guaranteed departure' : ''}</option>`).join('')}</select>
+        </label>
+        ${d && d.seats_total > 0 && d.seats_available <= 10 ? `<p class="tw-seats">Only ${plural(d.seats_available, 'seat')} left on this date</p>` : ''}`
+        : `<div class="tw-dates">
+            <label class="tw-field"><span>From</span><input type="date" name="from" data-fk="from" min="${isoTomorrow()}" value="${esc(state.from)}"></label>
+            <label class="tw-field"><span>To</span><input type="date" name="to" data-fk="to" min="${esc(state.from || isoTomorrow())}" value="${esc(state.to)}"></label>
+          </div>
+          <p class="tw-hint">No fixed departures yet. Choose the dates you prefer and we will confirm availability and price.</p>`;
+
+      const route = `
+        <div class="tw-route" aria-label="Tour route">
+          <div class="tw-city"><b>${esc(startCity || '—')}</b>${d ? `<span>${dmy(d.departure_date)}</span>` : ''}<small>Tour starts</small></div>
+          <div class="tw-line"><em>${esc(duration)}</em><i></i></div>
+          <div class="tw-city end"><b>${esc(endCity || '—')}</b>${d ? `<span>${dmy(d.return_date)}</span>` : ''}<small>Tour ends</small></div>
+        </div>`;
+
+      const guestRows = [
+        row({ icon: icons.user, name: 'Traveler', sub: 'Double Occupancy', price: u.adult > 0 ? money(u.adult, currency) : '',
+          step: stepper('Travelers', 'data-guest="adult"', c.adult, c.adult > 0 && n > minGuests, n < cap) })
+      ];
+      if (d && u.single > 0) {
+        guestRows.push(row({ icon: icons.room, name: T.capacity.private_rooms_type || 'Private room', sub: `Single occupancy · +${money(u.single, currency)} supplement`, price: money(u.adult + u.single, currency),
+          step: stepper('Private room travelers', 'data-guest="single"', c.single, c.single > 0 && n > minGuests, n < cap) }));
+      }
+      if (T.capacity.child_allowed) {
+        guestRows.push(row({ icon: icons.child, name: T.capacity.child_room_type || 'Child', sub: T.capacity.minimum_age > 0 ? `Minimum age ${T.capacity.minimum_age}` : 'Price per child', price: u.child > 0 ? money(u.child, currency) : '',
+          step: stepper('Children', 'data-guest="child"', c.child, c.child > 0 && n > minGuests, n < cap) }));
+      }
+
+      const extras = addons.length ? `
+        <section class="tw-sec">
+          <div class="tw-sec-head"><h4>Extras</h4><span>Optional</span></div>
+          ${addons.map((a, position) => {
+            const qty = state.addons[a.id] || 0;
+            const look = extraLook(a.addon_name, position);
+            const limit = num(a.max_qty) > 0 ? `Up to ${num(a.max_qty)}` : '';
+            const sub = [a.description, limit].filter(Boolean).join(' · ') || 'Optional extra';
+            return row({ icon: look.icon, tone: `background:${look.bg};color:${look.fg};border-color:transparent`, name: a.addon_name, sub, price: money(num(a.price), currency),
+              step: stepper(a.addon_name, `data-addon="${esc(a.id)}"`, qty, qty > 0, qty < addonMax(a)) });
+          }).join('')}
+        </section>` : '';
+
+      const payment = !fixedMode ? '' : `
+        <section class="tw-sec">
+          <div class="tw-sec-head"><h4>Payment</h4></div>
+          <div class="tw-pay">
+            ${depositPer > 0 ? `
+            <label class="tw-opt ${state.pay === 'deposit' ? 'is-on' : ''}">
+              <input type="radio" name="pay" value="deposit" data-fk="pay-deposit" ${state.pay === 'deposit' ? 'checked' : ''}>
+              <span class="tw-opt-main"><b>${esc(T.payment.option_label || 'I want to Deposit')}</b>
+                <small>${est ? `${money(est.depositBalance, currency)} balance paid later.` : 'Balance paid later.'}${installments > 1 && est && est.depositBalance > 0 ? `<br>You can pay it in easy installments like ${money(est.depositBalance / installments, currency)} × ${installments}` : ''}</small></span>
+              <span class="tw-opt-amt">${est ? money(est.depositNow, currency) : money(depositPer * n, currency)}</span>
+            </label>` : ''}
+            <label class="tw-opt ${state.pay === 'full' ? 'is-on' : ''}">
+              <input type="radio" name="pay" value="full" data-fk="pay-full" ${state.pay === 'full' ? 'checked' : ''}>
+              <span class="tw-opt-main"><b>Full price</b><small>I want to pay the full amount now.</small>${T.payment.show_deal_price_badge ? '<em class="tw-badge">Best price</em>' : ''}</span>
+              <span class="tw-opt-amt">${est ? money(est.total, currency) : '—'}</span>
+            </label>
+          </div>
+        </section>`;
+
+      const totalBar = fixedMode && est ? `
+        <div class="tw-total"><span>Trip total</span><b>${money(est.total, currency)}</b></div>
+        <p class="tw-due">Due now: <b>${money(est.due, currency)}</b>${est.balance > 0 ? ` · Balance ${money(est.balance, currency)}` : ''}</p>` : '';
+
+      const primaryLabel = fixedMode ? (T.cta.primary_label || 'Reserve now') : 'Send enquiry';
+      const secondaryLabel = T.cta.secondary_label || 'Enquiry Now';
+      const included = T.included.length ? `
+        <details class="tw-more"><summary>What is included</summary>
+          <ul class="tw-chips tw-incl">${T.included.map(name => `<li><span class="tw-tick">${icons.check}</span>${esc(name)}</li>`).join('')}</ul>
+        </details>` : '';
+
+      return `
+        <div class="tw">
+          ${T.info.departure_city ? `<p class="tw-dep">Departure city <b>${esc(T.info.departure_city)}</b></p>` : ''}
+          ${dateBlock}
+          ${route}
+          <section class="tw-sec">
+            <div class="tw-sec-head"><h4>Guests &amp; Rooms</h4><span>Maximum ${plural(maxGuests, 'guest')} at a time</span></div>
+            ${guestRows.join('')}
+            <p class="tw-count">${plural(n, 'Traveler')}</p>
+          </section>
+          ${extras}
+          ${T.capacity.notes ? `<p class="tw-note">${esc(T.capacity.notes)}</p>` : ''}
+          ${payment}
+          ${totalBar}
+          ${state.error ? `<p class="tw-err" role="alert">${esc(state.error)}</p>` : ''}
+          <div class="tw-actions">
+            ${fixedMode ? `<button type="button" class="tw-btn tw-ghost" data-act="enquiry">${esc(secondaryLabel)}</button>` : ''}
+            <button type="button" class="tw-btn tw-primary" data-act="${fixedMode ? 'reserve' : 'enquiry'}">${esc(primaryLabel)}</button>
+          </div>
+          ${T.has_itinerary_pdf ? `<button type="button" class="tw-link" data-act="itinerary">${icons.mail}<span>Email itinerary</span></button>` : ''}
+          ${included}
+        </div>`;
+    };
+
+    const renderWidget = () => {
+      const focusKey = document.activeElement && mount.contains(document.activeElement) ? document.activeElement.dataset.fk : null;
+      mount.innerHTML = widgetView();
+      if (focusKey) { const el = mount.querySelector(`[data-fk="${focusKey}"]`); if (el) el.focus(); }
+      setDurationFact(durationText());
+    };
+
+    // ---------- the pop-up (details, review, enquiry, itinerary) ----------
+    const dialogId = `tw-dialog-${++dialogCount}`;
     const dialog = document.createElement('dialog');
-    dialog.className = 'bb-dialog';
+    dialog.className = 'tw-dialog';
     dialog.id = dialogId;
     dialog.setAttribute('aria-labelledby', `${dialogId}-title`);
-    dialog.innerHTML = `<div class="bb-shell">
-      <header class="bb-head">
-        <div><small>Reserve with a deposit</small><h3 id="${dialogId}-title">${escapeHtml(options.tripTitle)}</h3></div>
-        <button type="button" class="bb-x" data-close aria-label="Close">✕</button>
-      </header>
-      ${options.isSample ? '<p class="bb-sample" role="note"><b>Sample mode</b> No payment is taken and no booking is created.</p>' : ''}
-      <ol class="bb-steps" aria-label="Booking progress"></ol>
-      <div class="bb-body"></div>
-    </div>`;
-    document.body.appendChild(dialog);
-    const stepList = dialog.querySelector('.bb-steps');
-    let focusAfterClose = null;
-    let scrollAfterClose = null;
-    const body = dialog.querySelector('.bb-body');
+    document.body.append(dialog);
 
-    const depositDue = () => options.depositPerTraveler * state.travelers;
-    const request = () => ({
-      tripId: options.tripId,
-      tripTitle: options.tripTitle,
-      startDate: state.startDate,
-      travelers: state.travelers,
-      depositPerTraveler: options.depositPerTraveler,
-      currency: options.currency,
-      lead: { name: state.name.trim(), email: state.email.trim(), phone: state.phone.trim() },
-      commerce: options.commerce
-    });
+    const dlg = { mode: 'reserve', step: 'details', name: '', email: '', phone: '', message: '', policy: false, errors: {}, error: '', busy: false, quote: null, done: '' };
+    const dField = (label, name, type, icon, extra = '') => `
+      <label class="tw-f">
+        <span class="tw-f-l">${label}</span>
+        <span class="tw-f-w ${dlg.errors[name] ? 'is-bad' : ''}"><i class="tw-f-i">${fieldIcons[icon]}</i>
+          <input type="${type}" name="${name}" data-fk="${name}" value="${esc(dlg[name])}" ${extra} ${dlg.errors[name] ? 'aria-invalid="true"' : ''}></span>
+        ${dlg.errors[name] ? `<em class="tw-ferr">${esc(dlg.errors[name])}</em>` : ''}
+      </label>`;
 
-    const renderSteps = () => {
-      const activeIndex = steps.findIndex(([key]) => key === state.step);
-      stepList.innerHTML = steps.map(([key, label], index) => `<li class="${index < activeIndex ? 'is-done' : ''} ${index === activeIndex ? 'is-current' : ''}" ${index === activeIndex ? 'aria-current="step"' : ''}><span>${index + 1}</span>${label}</li>`).join('');
+    const selectionRows = () => {
+      const d = date();
+      return [
+        fixedMode && d ? ['calendar', `${dmy(d.departure_date)} → ${dmy(d.return_date)}`] : (state.from && state.to ? ['calendar', `${dmy(state.from)} → ${dmy(state.to)}`] : null),
+        ['people', travelerSummary()],
+        extrasSummary() ? ['sparkle', extrasSummary()] : null
+      ].filter(Boolean);
+    };
+    const selectionSummary = () => {
+      const d = date();
+      const parts = [['Trip', title], ...selectionRows().map(([kind, text]) => [kind === 'calendar' ? (fixedMode && d ? 'Tour date' : 'Preferred dates') : kind === 'people' ? 'Travelers' : 'Extras', text])];
+      return `<dl class="tw-sum">${parts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
+    };
+    const selectionChips = () => `<ul class="tw-sumchips" aria-label="Your selection">${selectionRows().map(([kind, text]) => `<li><span>${iconLibrary[kind] || fieldIcons[kind]}</span>${esc(text)}</li>`).join('')}</ul>`;
+
+    const banner = (kicker, heading) => `
+      <header class="tw-hero" ${heroImage ? `style="background-image:linear-gradient(180deg,rgba(7,12,43,.15),rgba(7,12,43,.78)),url('${esc(heroImage)}')"` : ''}>
+        <button type="button" class="tw-x" data-d-act="close" aria-label="Close">✕</button>
+        <small>${esc(kicker)}</small>
+        <h3 class="tw-d-title" tabindex="-1" id="${dialogId}-title">${esc(heading)}</h3>
+        <p>${esc(title)}</p>
+      </header>`;
+
+    const reviewView = () => {
+      const q = dlg.quote;
+      return `
+        <h3 class="tw-d-title" tabindex="-1" id="${dialogId}-title">Review your booking</h3>
+        ${selectionSummary()}
+        <ul class="tw-lines">${q.lines.map(l => `<li><span>${esc(l.label)} × ${l.qty}</span><b>${money(num(l.amount), currency)}</b></li>`).join('')}</ul>
+        <div class="tw-total"><span>Trip total</span><b>${money(num(q.total), currency)}</b></div>
+        <div class="tw-total due"><span>${q.payment_type === 'deposit' ? 'Deposit due now' : 'Due now'}</span><b>${money(num(q.due_now), currency)}</b></div>
+        ${num(q.balance) > 0 ? `<p class="tw-hint">The remaining ${money(num(q.balance), currency)} is arranged with your ITA Global specialist.</p>` : ''}
+        ${dlg.error ? `<p class="tw-err" role="alert">${esc(dlg.error)}</p>` : ''}
+        <div class="tw-actions">
+          <button type="button" class="tw-btn tw-ghost" data-d-act="back" ${dlg.busy ? 'disabled' : ''}>Edit details</button>
+          <button type="button" class="tw-btn tw-primary" data-d-act="pay" ${dlg.busy ? 'disabled' : ''}>${dlg.busy ? 'Opening secure checkout…' : `Continue to payment · ${money(num(q.due_now), currency)}`}</button>
+        </div>`;
     };
 
-    const fieldError = key => state.errors[key] ? `<span class="bb-field-error" id="${dialogId}-${key}-error">${escapeHtml(state.errors[key])}</span>` : '';
-    const invalidAttributes = key => state.errors[key] ? `aria-invalid="true" aria-describedby="${dialogId}-${key}-error"` : '';
-
-    const detailsMarkup = () => {
-      const dateField = options.fixedDepartures.length
-        ? `<label class="bb-field"><span>Departure date</span><select name="startDate" ${invalidAttributes('startDate')}><option value="">Choose a departure</option>${options.fixedDepartures.map(date => `<option value="${date}" ${date === state.startDate ? 'selected' : ''}>${longDate(date)}</option>`).join('')}</select>${fieldError('startDate')}</label>`
-        : `<label class="bb-field"><span>Preferred start date</span><input name="startDate" type="date" min="${options.earliestStart}" max="${options.latestStart}" value="${escapeHtml(state.startDate)}" required ${invalidAttributes('startDate')}>${fieldError('startDate')}<small class="bb-help">Dates are arranged privately. A specialist confirms availability.</small></label>`;
-      return `<form class="bb-form" data-step="details" novalidate>
-        <h4 class="bb-step-title" tabindex="-1">Journey details</h4>
-        ${dateField}
-        <div class="bb-group">
-          <div class="bb-row"><span class="bb-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2"/></svg></span><span class="bb-row-text" id="${dialogId}-travelers-label"><strong>Travelers</strong><small>${money(options.depositPerTraveler, options.currency)} deposit per traveler</small></span>
-          <div class="bb-step" role="group" aria-labelledby="${dialogId}-travelers-label">
-            <button type="button" data-delta="-1" aria-label="Fewer travelers">−</button>
-            <output aria-live="polite" data-travelers>${state.travelers}</output>
-            <button type="button" data-delta="1" aria-label="More travelers">+</button>
-          </div></div>
-          <small class="bb-help" data-traveler-limit>${options.minTravelers}–${options.maxTravelers} travelers per reservation.</small>
-          ${fieldError('travelers')}
-        </div>
-        <div class="bb-group"><h4>Lead traveler</h4>
-          <label class="bb-field"><span>Full name</span><input name="name" autocomplete="name" value="${escapeHtml(state.name)}" required ${invalidAttributes('name')}>${fieldError('name')}</label>
-          <label class="bb-field"><span>Email</span><input name="email" type="email" inputmode="email" autocomplete="email" value="${escapeHtml(state.email)}" required ${invalidAttributes('email')}>${fieldError('email')}</label>
-          <label class="bb-field"><span>Phone / WhatsApp</span><input name="phone" type="tel" autocomplete="tel" placeholder="+1 555 010 0000" value="${escapeHtml(state.phone)}" required ${invalidAttributes('phone')}>${fieldError('phone')}</label>
-        </div>
-        <div class="bb-pay" aria-live="polite">
-          <div class="bb-pay-opt is-selected">
-            <div><strong>Reserve with a deposit</strong><small>The remaining balance is arranged with your ITA Global specialist.</small></div>
-            <b data-due>${money(depositDue(), options.currency)}</b>
+    const dialogView = () => {
+      const close = '<button type="button" class="tw-x tw-x-plain" data-d-act="close" aria-label="Close">✕</button>';
+      if (dlg.done) {
+        return `<div class="tw-d-body tw-done">${close}<span class="tw-done-ico">${icons.check}</span><h3 class="tw-d-title" tabindex="-1" id="${dialogId}-title">${dlg.mode === 'itinerary' ? 'Itinerary on its way' : 'Enquiry sent'}</h3><p>${esc(dlg.done)}</p><button type="button" class="tw-btn tw-primary" data-d-act="close">Close</button></div>`;
+      }
+      if (dlg.mode === 'reserve' && dlg.step === 'review' && dlg.quote) return `<div class="tw-d-body">${close}${reviewView()}</div>`;
+      const error = dlg.error ? `<p class="tw-err" role="alert">${esc(dlg.error)}</p>` : '';
+      if (dlg.mode === 'itinerary') {
+        return `${banner('Itinerary', 'Get the day-by-day plan')}
+          <form class="tw-d-body" novalidate>
+            <p class="tw-lead">We will email the full itinerary to your inbox.</p>
+            ${dField('Your name (optional)', 'name', 'text', 'user', 'autocomplete="name" placeholder="Jane Smith"')}
+            ${dField('Email', 'email', 'email', 'mail', 'autocomplete="email" inputmode="email" placeholder="jane@example.com"')}
+            ${error}
+            <button type="submit" class="tw-btn tw-primary tw-wide" ${dlg.busy ? 'disabled' : ''}>${dlg.busy ? 'Sending…' : `Send itinerary <i class="tw-btn-i">${fieldIcons.arrow}</i>`}</button>
+          </form>`;
+      }
+      const isEnquiry = dlg.mode === 'enquiry';
+      return `${banner(isEnquiry ? 'Enquiry' : 'Reserve', isEnquiry ? 'Tell us about your journey' : 'Your details')}
+        <form class="tw-d-body" novalidate>
+          ${isEnquiry ? '<p class="tw-lead">Share a few details and a specialist will get back to you.</p>' : ''}
+          ${selectionChips()}
+          <div class="tw-f-grid">
+            ${dField('Full name', 'name', 'text', 'user', 'autocomplete="name" placeholder="Jane Smith"')}
+            ${dField('Phone / WhatsApp', 'phone', 'tel', 'phone', 'autocomplete="tel" inputmode="tel" placeholder="+1 555 010 0000"')}
           </div>
-        </div>
-        <div class="bb-actions"><button type="submit" class="btn bb-primary">Review reservation <span class="arr">→</span></button></div>
-      </form>`;
+          ${dField('Email', 'email', 'email', 'mail', 'autocomplete="email" inputmode="email" placeholder="jane@example.com"')}
+          ${isEnquiry ? `<label class="tw-f"><span class="tw-f-l">Your message <em class="tw-opt-tag">optional</em></span>
+              <span class="tw-f-w tw-f-area"><i class="tw-f-i">${fieldIcons.chat}</i><textarea name="message" data-fk="message" rows="4" placeholder="Dates, special requests, questions…">${esc(dlg.message)}</textarea></span></label>`
+            : `<label class="tw-check"><input type="checkbox" name="policy" data-fk="policy" ${dlg.policy ? 'checked' : ''} ${dlg.errors.policy ? 'aria-invalid="true"' : ''}><span>I have read the <a href="#policies" data-policy>cancellation policy</a> for this journey.</span></label>${dlg.errors.policy ? `<em class="tw-ferr">${esc(dlg.errors.policy)}</em>` : ''}`}
+          ${error}
+          <button type="submit" class="tw-btn tw-primary tw-wide" ${dlg.busy ? 'disabled' : ''}>${dlg.busy ? 'Please wait…' : `${isEnquiry ? 'Send enquiry' : 'Review booking'} <i class="tw-btn-i">${fieldIcons.arrow}</i>`}</button>
+        </form>`;
     };
 
-    const reviewMarkup = () => `<form class="bb-form" data-step="review" novalidate>
-      <h4 class="bb-step-title" tabindex="-1">Review your reservation</h4>
-      <dl class="bb-review">
-        <div><dt>Journey</dt><dd>${escapeHtml(options.tripTitle)}</dd></div>
-        <div><dt>${options.fixedDepartures.length ? 'Departure' : 'Preferred start'}</dt><dd>${escapeHtml(longDate(state.startDate))}</dd></div>
-        <div><dt>Travelers</dt><dd>${state.travelers}</dd></div>
-        <div><dt>Lead traveler</dt><dd>${escapeHtml(state.name.trim())}</dd></div>
-        <div><dt>Email</dt><dd>${escapeHtml(state.email.trim())}</dd></div>
-        <div><dt>Phone</dt><dd>${escapeHtml(state.phone.trim())}</dd></div>
-      </dl>
-      <button type="button" class="bb-link" data-go="details">Edit details</button>
-      <div class="bb-summary">
-        <ul class="bb-lines"><li><span>${money(options.depositPerTraveler, options.currency)} × ${state.travelers} traveler${state.travelers === 1 ? '' : 's'}</span><span>${money(depositDue(), options.currency)}</span></li></ul>
-        <div class="bb-total due"><span>Deposit due now</span><b>${money(depositDue(), options.currency)}</b></div>
-        <p class="bb-hint">The remaining balance is arranged with your ITA Global specialist.</p>
-      </div>
-      <label class="bb-check"><input type="checkbox" name="policyAccepted" ${state.policyAccepted ? 'checked' : ''} ${invalidAttributes('policyAccepted')}><span>I have read the <a href="#policies" data-policy>cancellation policy</a> for this journey.</span></label>
-      ${fieldError('policyAccepted')}
-      ${state.submitError ? `<div class="bb-alert" role="alert"><b>Reservation not completed.</b> ${escapeHtml(state.submitError)} Your details are kept, so you can try again.</div>` : ''}
-      <div class="bb-actions split">
-        <button type="button" class="btn ghost bb-secondary" data-go="details" ${state.busy ? 'disabled' : ''}>Back</button>
-        <button type="submit" class="btn bb-primary" ${state.busy ? 'disabled aria-busy="true"' : ''}>${state.busy ? '<span class="bb-spinner" aria-hidden="true"></span>Please wait…' : (state.submitError ? 'Try again' : `${options.isSample ? 'Confirm sample deposit' : 'Continue to secure payment'} · ${money(depositDue(), options.currency)}`)}</button>
-      </div>
-      <p class="bb-hint center" aria-live="polite" data-status tabindex="-1">${state.busy ? (options.isSample ? 'Confirming your sample reservation…' : 'Taking you to Shopify’s secure payment page…') : (options.isSample ? 'Sample mode: confirming does not charge you or create a booking.' : 'You will review and pay your deposit on the next page.')}</p>
-    </form>`;
-
-    const doneMarkup = () => {
-      const result = state.result;
-      return `<div class="bb-done">
-        <span class="bb-done-mark" aria-hidden="true">✓</span>
-        <h4 class="bb-step-title" tabindex="-1">Sample reservation complete</h4>
-        <p>This is a demonstration only. No payment was taken and no booking was created.</p>
-        <dl class="bb-review">
-          <div><dt>Sample reference</dt><dd><b>${escapeHtml(result.reference)}</b></dd></div>
-          <div><dt>Journey</dt><dd>${escapeHtml(result.tripTitle)}</dd></div>
-          <div><dt>Preferred start</dt><dd>${escapeHtml(longDate(result.startDate))}</dd></div>
-          <div><dt>Travelers</dt><dd>${result.travelers}</dd></div>
-          <div><dt>Sample deposit</dt><dd>${money(result.depositDue, result.currency)}</dd></div>
-        </dl>
-        <p class="bb-hint">When checkout is connected, this step will hand over to Shopify’s secure payment page and a specialist will confirm availability.</p>
-        <div class="bb-actions"><button type="button" class="btn bb-primary" data-close>Done</button></div>
-      </div>`;
+    const renderDialog = focusSelector => {
+      const focusKey = document.activeElement && dialog.contains(document.activeElement) ? document.activeElement.dataset.fk : null;
+      dialog.innerHTML = dialogView();
+      const target = (focusSelector && dialog.querySelector(focusSelector)) || (focusKey && dialog.querySelector(`[data-fk="${focusKey}"]`));
+      if (target) target.focus();
     };
 
-    const render = focusTarget => {
-      renderSteps();
-      body.innerHTML = state.step === 'details' ? detailsMarkup() : state.step === 'review' ? reviewMarkup() : doneMarkup();
-      body.scrollTop = 0;
-      dialog.querySelector('.bb-shell').scrollTop = 0;
-      const target = focusTarget ? body.querySelector(focusTarget) : body.querySelector('.bb-step-title');
-      target?.focus({ preventScroll: false });
+    const openDialog = mode => {
+      Object.assign(dlg, { mode, step: 'details', errors: {}, error: '', busy: false, quote: null, done: '' });
+      document.documentElement.classList.add('tw-lock');
+      renderDialog();
+      if (!dialog.open) dialog.showModal();
+      const first = dialog.querySelector('[data-fk="name"], [data-fk="email"]') || dialog.querySelector('.tw-d-title');
+      if (first) first.focus();
+    };
+    dialog.addEventListener('close', () => document.documentElement.classList.remove('tw-lock'));
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+
+    const validateContact = needPhone => {
+      const errors = {};
+      if (dlg.mode !== 'itinerary' && !dlg.name.trim()) errors.name = 'Add your full name.';
+      if (!emailPattern.test(dlg.email.trim())) errors.email = 'Add a valid email address, e.g. jane@company.com.';
+      if (needPhone && (!phonePattern.test(dlg.phone.trim()) || dlg.phone.replace(/\D/g, '').length < 7)) errors.phone = 'Add a phone or WhatsApp number with country code.';
+      return errors;
     };
 
-    const updateTravelerDisplay = () => {
-      body.querySelector('[data-travelers]').textContent = state.travelers;
-      body.querySelector('[data-due]').textContent = money(depositDue(), options.currency);
-      body.querySelectorAll('[data-delta]').forEach(button => {
-        const delta = Number(button.dataset.delta);
-        button.disabled = delta < 0 ? state.travelers <= options.minTravelers : state.travelers >= options.maxTravelers;
-      });
+    const enquiryMessage = () => {
+      const d = date();
+      const lines = [`Trip: ${title}`];
+      if (fixedMode && d) lines.push(`Tour date: ${dmy(d.departure_date)} to ${dmy(d.return_date)}`);
+      else lines.push(state.from && state.to ? `Preferred dates: ${dmy(state.from)} to ${dmy(state.to)}` : 'Preferred dates: not chosen yet');
+      lines.push(`Travelers: ${travelerSummary()}`);
+      if (extrasSummary()) lines.push(`Extras: ${extrasSummary()}`);
+      const est = estimate();
+      if (fixedMode && est) lines.push(`Estimated total: ${money(est.total, currency)} (${state.pay === 'deposit' ? 'deposit' : 'full payment'} preferred)`);
+      if (dlg.message.trim()) lines.push('', `Message: ${dlg.message.trim()}`);
+      return lines.join('\n');
     };
 
-    const clearFieldError = name => {
-      if (!state.errors[name]) return;
-      delete state.errors[name];
-      const field = body.querySelector(`[name="${name}"]`);
-      field?.removeAttribute('aria-invalid');
-      field?.removeAttribute('aria-describedby');
-      body.querySelector(`#${dialogId}-${name}-error`)?.remove();
-    };
-
-    const submitDetails = () => {
-      const errors = services.booking.validateDepositRequest(request(), options);
-      state.errors = errors;
-      const firstInvalid = ['startDate', 'name', 'email', 'phone'].find(key => errors[key]);
-      if (Object.keys(errors).length) { render(firstInvalid ? `[name="${firstInvalid}"]` : '[data-delta]'); updateTravelerDisplay(); return; }
-      state.step = 'review';
-      state.submitError = '';
-      render();
-    };
-
-    const submitReview = async () => {
-      if (state.busy) return;
-      if (!state.policyAccepted) {
-        state.errors = { policyAccepted: 'Please confirm you have read the cancellation policy.' };
-        render('[name="policyAccepted"]');
-        return;
-      }
-      state.errors = {};
-      state.busy = true;
-      state.submitError = '';
-      render('[data-status]');
+    const submitDialog = async () => {
+      if (dlg.busy) return;
+      const needPhone = dlg.mode !== 'itinerary';
+      const errors = validateContact(needPhone);
+      if (dlg.mode === 'reserve' && !dlg.policy) errors.policy = 'Please confirm you have read the cancellation policy.';
+      dlg.errors = errors;
+      dlg.error = '';
+      if (Object.keys(errors).length) { renderDialog(`[name="${Object.keys(errors)[0]}"]`); return; }
+      dlg.busy = true;
+      renderDialog();
       try {
-        state.result = await services.booking.createDepositReservation(request());
-        if (state.result.redirectUrl) {
-          window.location.assign(state.result.redirectUrl);
-          return;
+        if (dlg.mode === 'enquiry') {
+          await api.enquiry({ shopify_product_id: productId, name: dlg.name.trim(), email: dlg.email.trim(), phone: dlg.phone.trim(), message: enquiryMessage() });
+          dlg.done = 'Thank you. A specialist will reply to you shortly.';
+        } else if (dlg.mode === 'itinerary') {
+          await api.itinerary({ shopify_product_id: productId, name: dlg.name.trim(), email: dlg.email.trim() });
+          dlg.done = `We sent the itinerary to ${dlg.email.trim()}. Please check your inbox.`;
+        } else {
+          dlg.quote = await api.quote(buildPayload({ name: dlg.name.trim(), email: dlg.email.trim(), phone: dlg.phone.trim() }));
+          dlg.step = 'review';
         }
-        state.busy = false;
-        state.step = 'done';
-        render();
-      } catch (error) {
-        state.busy = false;
-        state.submitError = error?.message || 'The service did not respond. Nothing was charged.';
-        render('.bb-primary');
+      } catch (failure) {
+        dlg.error = failure.message || 'Something went wrong. Nothing was charged. Please try again.';
+      }
+      dlg.busy = false;
+      renderDialog('.tw-d-title');
+    };
+
+    const startPayment = async () => {
+      if (dlg.busy) return;
+      dlg.busy = true; dlg.error = '';
+      renderDialog();
+      try {
+        const result = await api.checkout(buildPayload({ name: dlg.name.trim(), email: dlg.email.trim(), phone: dlg.phone.trim() }));
+        if (!result || !/^https:\/\//.test(result.checkout_url || '')) throw new Error('Checkout could not be started. Nothing was charged. Please try again.');
+        window.location.assign(result.checkout_url);
+      } catch (failure) {
+        dlg.busy = false;
+        dlg.error = failure.message || 'Checkout could not be started. Nothing was charged.';
+        renderDialog();
       }
     };
 
-    const openDialog = () => {
-      if (state.step === 'done') state = blankState();
-      if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
-      document.documentElement.classList.add('bb-lock');
-      render(state.step === 'details' ? '[name="startDate"]' : null);
-      if (state.step === 'details') updateTravelerDisplay();
-    };
-
-    const closeDialog = () => {
-      if (state.busy) return;
-      if (dialog.open && typeof dialog.close === 'function') dialog.close(); else dialog.removeAttribute('open');
-    };
-
-    dialog.addEventListener('cancel', event => { if (state.busy) event.preventDefault(); });
-    dialog.addEventListener('close', () => {
-      document.documentElement.classList.remove('bb-lock');
-      if (state.step === 'done') state = blankState();
-      const target = focusAfterClose || openButton;
-      focusAfterClose = null;
-      target.focus({ preventScroll: target !== openButton });
-      if (scrollAfterClose) {
-        scrollAfterClose.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-        scrollAfterClose = null;
-      }
+    dialog.addEventListener('input', event => {
+      const field = event.target;
+      if (field.name in dlg && field.type !== 'checkbox') dlg[field.name] = field.value;
+      if (field.name === 'policy') { dlg.policy = field.checked; if (field.checked && dlg.errors.policy) { delete dlg.errors.policy; } }
     });
-
+    dialog.addEventListener('submit', event => { event.preventDefault(); submitDialog(); });
     dialog.addEventListener('click', event => {
-      if (event.target === dialog || event.target.closest('[data-close]')) { closeDialog(); return; }
       const policyLink = event.target.closest('[data-policy]');
       if (policyLink) {
         event.preventDefault();
-        const policies = document.querySelector('#policies');
-        if (policies) {
-          const heading = policies.querySelector('h2') || policies;
-          heading.tabIndex = -1;
-          focusAfterClose = heading;
-          scrollAfterClose = policies;
-        }
-        closeDialog();
+        dialog.close();
+        const target = document.querySelector('#policies');
+        if (target) target.scrollIntoView({ behavior: 'smooth' }); else window.location.hash = 'policies';
         return;
       }
-      const stepButton = event.target.closest('[data-delta]');
-      if (stepButton) {
-        state.travelers = Math.max(options.minTravelers, Math.min(options.maxTravelers, state.travelers + Number(stepButton.dataset.delta)));
-        clearFieldError('travelers');
-        updateTravelerDisplay();
-        if (stepButton.disabled) body.querySelector(`[data-delta="${-Number(stepButton.dataset.delta)}"]`)?.focus();
+      const button = event.target.closest('[data-d-act]');
+      if (!button) return;
+      const action = button.dataset.dAct;
+      if (action === 'close') dialog.close();
+      if (action === 'back') { dlg.step = 'details'; dlg.error = ''; renderDialog('[data-fk="name"]'); }
+      if (action === 'pay') startPayment();
+    });
+
+    // ---------- widget events ----------
+    const checkReady = () => {
+      if (fixedMode) {
+        if (!date()) return 'Please choose a tour date.';
+      } else {
+        if (!state.from || !state.to) return 'Please choose your From and To dates.';
+        if (state.to < state.from) return 'The end date must be after the start date.';
+      }
+      if (travelers() < minGuests) return `Please choose at least ${plural(minGuests, 'traveler')}.`;
+      if (state.counts.adult + state.counts.single < 1) return 'At least one adult is needed.';
+      return '';
+    };
+
+    mount.addEventListener('click', event => {
+      const guest = event.target.closest('[data-guest]');
+      if (guest) {
+        const kind = guest.dataset.guest;
+        const delta = Number(guest.dataset.d);
+        const next = state.counts[kind] + delta;
+        const total = travelers() + delta;
+        if (next >= 0 && total >= minGuests && total <= guestCap()) state.counts[kind] = next;
+        state.error = '';
+        renderWidget();
         return;
       }
-      const goButton = event.target.closest('[data-go]');
-      if (goButton && !state.busy) {
-        state.step = goButton.dataset.go;
-        state.errors = {};
-        render(state.step === 'details' ? '[name="startDate"]' : null);
-        if (state.step === 'details') updateTravelerDisplay();
+      const extra = event.target.closest('[data-addon]');
+      if (extra) {
+        const addon = addons.find(a => String(a.id) === extra.dataset.addon);
+        if (!addon) return;
+        const next = (state.addons[addon.id] || 0) + Number(extra.dataset.d);
+        if (next >= 0 && next <= addonMax(addon)) state.addons[addon.id] = next;
+        renderWidget();
+        return;
       }
+      const action = event.target.closest('[data-act]');
+      if (!action) return;
+      if (action.dataset.act === 'itinerary') { openDialog('itinerary'); return; }
+      const problem = checkReady();
+      if (problem && action.dataset.act === 'reserve') { state.error = problem; renderWidget(); return; }
+      state.error = '';
+      renderWidget();
+      openDialog(action.dataset.act === 'reserve' ? 'reserve' : 'enquiry');
     });
 
-    dialog.addEventListener('input', event => {
-      const { name, type, checked, value } = event.target;
-      if (!(name in state)) return;
-      state[name] = type === 'checkbox' ? checked : value;
-      clearFieldError(name);
-    });
-    dialog.addEventListener('change', event => {
-      if (event.target.name === 'startDate') { state.startDate = event.target.value; clearFieldError('startDate'); }
-      if (event.target.name === 'policyAccepted') { state.policyAccepted = event.target.checked; clearFieldError('policyAccepted'); }
+    mount.addEventListener('input', event => {
+      const field = event.target;
+      if (field.name === 'dateId') {
+        state.dateId = field.value;
+        const d = date();
+        if (d && !(num(d.single_supplement) > 0)) state.counts.single = 0;
+        while (travelers() > guestCap() && state.counts.adult > 1) state.counts.adult -= 1;
+      } else if (field.name === 'pay') {
+        state.pay = field.value;
+      } else if (field.name === 'from' || field.name === 'to') {
+        state[field.name] = field.value;
+        if (state.to && state.from && state.to < state.from) state.to = state.from;
+      } else return;
+      state.error = '';
+      renderWidget();
     });
 
-    dialog.addEventListener('submit', event => {
-      event.preventDefault();
-      const step = event.target.dataset.step;
-      if (step === 'details') submitDetails();
-      if (step === 'review') submitReview();
-    });
-
-    openButton.addEventListener('click', openDialog);
-    document.querySelectorAll('[data-open-booking]').forEach(link => link.addEventListener('click', event => { event.preventDefault(); openDialog(); }));
-
-    window.addEventListener('pageshow', event => {
-      if (!event.persisted || !state.busy) return;
-      state.busy = false;
-      if (dialog.open) render();
-    });
+    renderWidget();
   };
 
   mounts.forEach(init);
