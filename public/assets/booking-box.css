@@ -189,3 +189,10 @@
   .tw-hero { min-height: 150px; padding: 20px 20px 18px; }
   .tw-hero .tw-d-title { font-size: 22px; }
 }
+
+/* package type tags (from the admin) */
+.tw-tags { display: grid; gap: 6px; }
+.tw-tags ul { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+.tw-tags li { padding: 5px 12px; border-radius: 99px; background: var(--tw-soft); border: 1px solid var(--tw-line); font-size: 12px; font-weight: 700; color: var(--tw-ink); }
+.tw-tags p { margin: 0; font-size: 12.5px; color: var(--tw-muted); }
+.tw-tags p b { color: var(--tw-ink); }

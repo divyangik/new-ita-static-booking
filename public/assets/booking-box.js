@@ -107,13 +107,8 @@
     // The old fixed route box is replaced by the live route box inside the widget
     root.querySelectorAll('.td-route').forEach(el => el.remove());
 
-    const cities = (trip.trip && trip.trip.cities) || [];
-    const rows = [];
-    if (cities.length) rows.push(['Destinations', cities.join(' · ')]);
-    else if (trip.trip && trip.trip.info.country) rows.push(['Destination', trip.trip.info.country]);
-    if (card.hotels_included) rows.push(['Hotels', 'Included']);
     const list = root.querySelector('.td-book-list');
-    if (list) list.innerHTML = rows.map(([label, value]) => `<li data-fact="${esc(label.toLowerCase())}"><span>${esc(label)}</span><b>${esc(value)}</b></li>`).join('');
+    if (list) list.innerHTML = '';
   };
 
   const init = async mount => {
@@ -139,7 +134,7 @@
       ['Available', 'Guaranteed'].includes(d.status) && String(d.departure_date) > today && !(d.seats_total > 0 && d.seats_available <= 0));
     const fixedMode = openDates.length > 0;
     const minGuests = Math.max(1, num(T.capacity.min_group_size));
-    const maxGuests = num(T.capacity.max_group_size) > 0 ? num(T.capacity.max_group_size) : 20;
+    const ROW_MAX = 20;
     const addons = (trip.addons || []).filter(a => a.visible !== false);
     const depositPer = num(T.payment.deposit_amount);
     const installments = Math.max(1, num(T.payment.installments));
@@ -147,14 +142,24 @@
     const endCity = T.info.end_city || startCity;
     const defaultDate = openDates.find(d => d.is_default) || openDates[0] || null;
 
+    // Rows of Guests & Rooms: one per package type selected in the admin (or a plain Traveler row)
+    const childType = (T.traveller_types || []).find(t => /^child/i.test(t.value || t.name)) || null;
+    const isCouple = t => /^couple/i.test(t.value || t.name);
+    const packageKinds = (T.package_types || []).length
+      ? T.package_types.map(t => ({ key: `pkg:${t.value || t.name}`, type: isCouple(t) ? 'couple' : 'adult', label: t.name, name: t.name, sub: t.message || (isCouple(t) ? 'Couple room' : 'Double Occupancy'), mult: isCouple(t) ? 2 : 1, icon: icons.user }))
+      : [{ key: 'adult', type: 'adult', label: '', name: 'Traveler', sub: 'Double Occupancy', mult: 1, icon: icons.user }];
+    const singleKind = { key: 'single', type: 'single', label: '', name: T.capacity.private_rooms_type || 'Private room', mult: 1, icon: icons.room };
+    const childKind = childType && T.capacity.child_allowed ? { key: 'child', type: 'child', label: '', name: T.capacity.child_room_type || childType.name || 'Child', sub: childType.message || 'Price per child', mult: 1, icon: icons.child } : null;
+
     const state = {
       dateId: defaultDate ? String(defaultDate.id) : '',
       from: '', to: '',
-      counts: { adult: Math.min(minGuests, maxGuests), single: 0, child: 0 },
+      counts: {},
       addons: {},
       pay: depositPer > 0 && !T.payment.preselect_full_payment ? 'deposit' : 'full',
       error: ''
     };
+    state.counts[packageKinds[0].key] = Math.max(1, Math.ceil(minGuests / packageKinds[0].mult));
 
     const date = () => openDates.find(d => String(d.id) === state.dateId) || null;
     const cleanLabel = text => (text && !/^(n\/?a|none|null|-+|—)$/i.test(String(text).trim()) ? String(text).trim() : '');
@@ -173,42 +178,39 @@
       if (!item) { item = document.createElement('li'); item.dataset.fact = 'duration'; item.innerHTML = '<span>Duration</span><b></b>'; list.prepend(item); }
       item.querySelector('b').textContent = text;
     };
-    const travelers = () => state.counts.adult + state.counts.single + state.counts.child;
+    const allKinds = () => [...packageKinds, singleKind, childKind].filter(Boolean);
+    const qtyOf = kind => state.counts[kind.key] || 0;
+    const travelers = () => allKinds().reduce((n, kind) => n + qtyOf(kind) * kind.mult, 0);
+    const adultCount = () => allKinds().filter(kind => kind.type !== 'child').reduce((n, kind) => n + qtyOf(kind) * kind.mult, 0);
+    const pricePer = (kind, u) => (kind.type === 'couple' ? u.adult * 2 : kind.type === 'single' ? u.adult + u.single : kind.type === 'child' ? u.child : u.adult);
     const seatLimit = () => { const d = date(); return d && d.seats_total > 0 ? d.seats_available : Infinity; };
-    const guestCap = () => Math.min(maxGuests, seatLimit());
+    const guestCap = () => seatLimit();
     // The admin sets the maximum in the dashboard (Max quantity). 0 means no limit, up to a safety cap.
     const addonMax = addon => (num(addon.max_qty) > 0 ? num(addon.max_qty) : 20);
     const unitPrices = () => {
       const d = date();
-      if (d) return { adult: num(d.adult_price), child: num(d.child_price) || num(d.adult_price), single: num(d.single_supplement) };
       const p = num(T.pricing.price_per_person);
+      if (d) { const adult = num(d.adult_price) || p; return { adult, child: num(d.child_price) || adult, single: num(d.single_supplement) }; }
       return { adult: p, child: p, single: 0 };
     };
     const estimate = () => {
       const d = date();
       if (!d) return null;
       const u = unitPrices();
-      const c = state.counts;
-      let total = c.adult * u.adult + c.single * (u.adult + u.single) + c.child * u.child;
+      let total = allKinds().reduce((sum, kind) => sum + qtyOf(kind) * pricePer(kind, u), 0);
       addons.forEach(a => { total += (state.addons[a.id] || 0) * num(a.price); });
       const deposit = depositPer * travelers();
       const due = state.pay === 'deposit' && deposit > 0 ? Math.min(deposit, total) : total;
       const depositNow = deposit > 0 ? Math.min(deposit, total) : 0;
       return { total, due, balance: total - due, depositNow, depositBalance: total - depositNow };
     };
-    const travelerSummary = () => {
-      const c = state.counts;
-      const parts = [];
-      if (c.adult) parts.push(plural(c.adult, 'adult'));
-      if (c.single) parts.push(`${plural(c.single, 'adult')} in private ${c.single === 1 ? 'room' : 'rooms'}`);
-      if (c.child) parts.push(plural(c.child, 'child').replace('childs', 'children'));
-      return parts.join(', ');
-    };
+    const travelerSummary = () => allKinds().filter(kind => qtyOf(kind) > 0)
+      .map(kind => `${qtyOf(kind)} ${kind.name}${kind.type === 'couple' ? ' (2 travelers)' : ''}`).join(', ');
     const extrasSummary = () => addons.filter(a => state.addons[a.id] > 0).map(a => `${state.addons[a.id]} × ${a.addon_name}`).join(', ');
     const buildPayload = contact => ({
       shopify_product_id: productId,
       date_id: date() ? date().id : null,
-      rows: ['adult', 'single', 'child'].filter(k => state.counts[k] > 0).map(k => ({ type: k, qty: state.counts[k] })),
+      rows: allKinds().filter(kind => qtyOf(kind) > 0).map(kind => ({ type: kind.type, qty: qtyOf(kind), ...(kind.label ? { label: kind.label } : {}) })),
       addons: addons.filter(a => state.addons[a.id] > 0).map(a => ({ id: a.id, qty: state.addons[a.id] })),
       payment_type: state.pay === 'full' ? 'full' : 'deposit',
       contact
@@ -233,7 +235,6 @@
     const widgetView = () => {
       const d = date();
       const u = unitPrices();
-      const c = state.counts;
       const n = travelers();
       const cap = guestCap();
       const est = estimate();
@@ -250,25 +251,20 @@
           </div>
           <p class="tw-hint">No fixed departures yet. Choose the dates you prefer and we will confirm availability and price.</p>`;
 
-      const route = `
+      const route = !(startCity || endCity) ? '' : `
         <div class="tw-route" aria-label="Tour route">
           <div class="tw-city"><b>${esc(startCity || '—')}</b>${d ? `<span>${dmy(d.departure_date)}</span>` : ''}<small>Tour starts</small></div>
           <div class="tw-line"><em>${esc(duration)}</em><i></i></div>
           <div class="tw-city end"><b>${esc(endCity || '—')}</b>${d ? `<span>${dmy(d.return_date)}</span>` : ''}<small>Tour ends</small></div>
         </div>`;
 
-      const guestRows = [
-        row({ icon: icons.user, name: 'Traveler', sub: 'Double Occupancy', price: u.adult > 0 ? money(u.adult, currency) : '',
-          step: stepper('Travelers', 'data-guest="adult"', c.adult, c.adult > 0 && n > minGuests, n < cap) })
-      ];
-      if (d && u.single > 0) {
-        guestRows.push(row({ icon: icons.room, name: T.capacity.private_rooms_type || 'Private room', sub: `Single occupancy · +${money(u.single, currency)} supplement`, price: money(u.adult + u.single, currency),
-          step: stepper('Private room travelers', 'data-guest="single"', c.single, c.single > 0 && n > minGuests, n < cap) }));
-      }
-      if (T.capacity.child_allowed) {
-        guestRows.push(row({ icon: icons.child, name: T.capacity.child_room_type || 'Child', sub: T.capacity.minimum_age > 0 ? `Minimum age ${T.capacity.minimum_age}` : 'Price per child', price: u.child > 0 ? money(u.child, currency) : '',
-          step: stepper('Children', 'data-guest="child"', c.child, c.child > 0 && n > minGuests, n < cap) }));
-      }
+      const visibleKinds = allKinds().filter(kind => kind !== singleKind || (d && u.single > 0));
+      const guestRows = visibleKinds.map(kind => {
+        const price = pricePer(kind, u);
+        const sub = kind === singleKind ? `Single occupancy · +${money(u.single, currency)} supplement` : kind.sub;
+        return row({ icon: kind.icon, name: kind.name, sub, price: price > 0 ? money(price, currency) : '',
+          step: stepper(kind.name, `data-guest="${esc(kind.key)}"`, qtyOf(kind), qtyOf(kind) > 0 && n - kind.mult >= minGuests, qtyOf(kind) < ROW_MAX && n + kind.mult <= cap) });
+      });
 
       const extras = addons.length ? `
         <section class="tw-sec">
@@ -291,12 +287,12 @@
             <label class="tw-opt ${state.pay === 'deposit' ? 'is-on' : ''}">
               <input type="radio" name="pay" value="deposit" data-fk="pay-deposit" ${state.pay === 'deposit' ? 'checked' : ''}>
               <span class="tw-opt-main"><b>${esc(T.payment.option_label || 'I want to Deposit')}</b>
-                <small>${est ? `${money(est.depositBalance, currency)} balance paid later.` : 'Balance paid later.'}${installments > 1 && est && est.depositBalance > 0 ? `<br>You can pay it in easy installments like ${money(est.depositBalance / installments, currency)} × ${installments}` : ''}</small></span>
+                <small>${est ? `${money(est.depositBalance, currency)} balance paid later.` : 'Balance paid later.'}${installments > 1 && est && est.depositBalance > 0 ? `<br>(You can pay it in easy installments like ${money(est.depositBalance / installments, currency)} × ${installments})` : ''}</small></span>
               <span class="tw-opt-amt">${est ? money(est.depositNow, currency) : money(depositPer * n, currency)}</span>
             </label>` : ''}
             <label class="tw-opt ${state.pay === 'full' ? 'is-on' : ''}">
               <input type="radio" name="pay" value="full" data-fk="pay-full" ${state.pay === 'full' ? 'checked' : ''}>
-              <span class="tw-opt-main"><b>Full price</b><small>I want to pay the full amount now.</small>${T.payment.show_deal_price_badge ? '<em class="tw-badge">Best price</em>' : ''}</span>
+              <span class="tw-opt-main"><b>Full Price</b><small>I want to pay full payment.</small>${T.payment.show_deal_price_badge ? '<em class="tw-badge">Best price</em>' : ''}</span>
               <span class="tw-opt-amt">${est ? money(est.total, currency) : '—'}</span>
             </label>
           </div>
@@ -306,25 +302,19 @@
         <div class="tw-total"><span>Trip total</span><b>${money(est.total, currency)}</b></div>
         <p class="tw-due">Due now: <b>${money(est.due, currency)}</b>${est.balance > 0 ? ` · Balance ${money(est.balance, currency)}` : ''}</p>` : '';
 
-      const primaryLabel = fixedMode ? (T.cta.primary_label || 'Reserve now') : 'Send enquiry';
+      const primaryLabel = fixedMode ? (T.cta.primary_label || 'Book now') : 'Send enquiry';
       const secondaryLabel = T.cta.secondary_label || 'Enquiry Now';
-      const included = T.included.length ? `
-        <details class="tw-more"><summary>What is included</summary>
-          <ul class="tw-chips tw-incl">${T.included.map(name => `<li><span class="tw-tick">${icons.check}</span>${esc(name)}</li>`).join('')}</ul>
-        </details>` : '';
-
       return `
         <div class="tw">
           ${T.info.departure_city ? `<p class="tw-dep">Departure city <b>${esc(T.info.departure_city)}</b></p>` : ''}
           ${dateBlock}
           ${route}
           <section class="tw-sec">
-            <div class="tw-sec-head"><h4>Guests &amp; Rooms</h4><span>Maximum ${plural(maxGuests, 'guest')} at a time</span></div>
+            <div class="tw-sec-head"><h4>Guests &amp; Rooms</h4></div>
             ${guestRows.join('')}
             <p class="tw-count">${plural(n, 'Traveler')}</p>
           </section>
           ${extras}
-          ${T.capacity.notes ? `<p class="tw-note">${esc(T.capacity.notes)}</p>` : ''}
           ${payment}
           ${totalBar}
           ${state.error ? `<p class="tw-err" role="alert">${esc(state.error)}</p>` : ''}
@@ -333,7 +323,6 @@
             <button type="button" class="tw-btn tw-primary" data-act="${fixedMode ? 'reserve' : 'enquiry'}">${esc(primaryLabel)}</button>
           </div>
           ${T.has_itinerary_pdf ? `<button type="button" class="tw-link" data-act="itinerary">${icons.mail}<span>Email itinerary</span></button>` : ''}
-          ${included}
         </div>`;
     };
 
@@ -549,18 +538,20 @@
         if (state.to < state.from) return 'The end date must be after the start date.';
       }
       if (travelers() < minGuests) return `Please choose at least ${plural(minGuests, 'traveler')}.`;
-      if (state.counts.adult + state.counts.single < 1) return 'At least one adult is needed.';
+      if (adultCount() < 1) return 'At least one adult is needed.';
       return '';
     };
 
     mount.addEventListener('click', event => {
       const guest = event.target.closest('[data-guest]');
       if (guest) {
-        const kind = guest.dataset.guest;
+        const kind = allKinds().find(k => k.key === guest.dataset.guest);
         const delta = Number(guest.dataset.d);
-        const next = state.counts[kind] + delta;
-        const total = travelers() + delta;
-        if (next >= 0 && total >= minGuests && total <= guestCap()) state.counts[kind] = next;
+        if (kind) {
+          const next = qtyOf(kind) + delta;
+          const total = travelers() + delta * kind.mult;
+          if (next >= 0 && next <= ROW_MAX && total >= minGuests && total <= guestCap()) state.counts[kind.key] = next;
+        }
         state.error = '';
         renderWidget();
         return;
@@ -590,7 +581,8 @@
         state.dateId = field.value;
         const d = date();
         if (d && !(num(d.single_supplement) > 0)) state.counts.single = 0;
-        while (travelers() > guestCap() && state.counts.adult > 1) state.counts.adult -= 1;
+        const first = packageKinds[0];
+        while (travelers() > guestCap() && qtyOf(first) > 1) state.counts[first.key] -= 1;
       } else if (field.name === 'pay') {
         state.pay = field.value;
       } else if (field.name === 'from' || field.name === 'to') {
