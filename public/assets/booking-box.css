@@ -76,17 +76,17 @@
 .tw-more[open] summary::after { content: '−'; }
 .tw-more summary::-webkit-details-marker { display: none; }
 
-/* payment ions */
+/* payment options */
 .tw-pay { display: grid; gap: 10px; }
-.tw- { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 12px; padding: 14px 16px; border: 1px solid var(--tw-line); border-radius: 14px; background: #fff; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
-.tw-:hover { border-color: rgba(11,19,64,.32); }
-.tw-.is-on { border-color: var(--tw-accent); background: #fdf3f4; box-shadow: 0 0 0 1px var(--tw-accent) inset; }
-.tw- input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--tw-accent); }
-.tw--main { display: grid; gap: 2px; min-width: 0; }
-.tw--main b { font-size: 14.5px; font-weight: 700; }
-.tw--main small { line-height: 1.4; }
+.tw-opt { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 12px; padding: 14px 16px; border: 1px solid var(--tw-line); border-radius: 14px; background: #fff; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
+.tw-opt:hover { border-color: rgba(11,19,64,.32); }
+.tw-opt.is-on { border-color: var(--tw-accent); background: #fdf3f4; box-shadow: 0 0 0 1px var(--tw-accent) inset; }
+.tw-opt input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--tw-accent); }
+.tw-opt-main { display: grid; gap: 2px; min-width: 0; }
+.tw-opt-main b { font-size: 14.5px; font-weight: 700; }
+.tw-opt-main small { line-height: 1.4; }
 .tw-badge { justify-self: start; margin-top: 4px; padding: 2px 9px; border-radius: 99px; background: var(--tw-navy); color: #fff; font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.tw--amt { font-size: 18px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.tw-opt-amt { font-size: 18px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
 /* totals + buttons */
 .tw-total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 14px; border-top: 1px solid var(--tw-line); }
@@ -170,7 +170,7 @@
 .tw-f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .tw-f { display: grid; gap: 6px; }
 .tw-f-l { font-size: 12.5px; font-weight: 700; color: var(--ink, #070c2b); }
-.tw--tag { font-style: normal; font-weight: 600; font-size: 11px; color: var(--muted, #5b6080); margin-left: 4px; }
+.tw-opt-tag { font-style: normal; font-weight: 600; font-size: 11px; color: var(--muted, #5b6080); margin-left: 4px; }
 .tw-f-w { position: relative; display: block; }
 .tw-f-i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 18px; height: 18px; color: #8a8fab; pointer-events: none; }
 .tw-f-i svg { width: 18px; height: 18px; }

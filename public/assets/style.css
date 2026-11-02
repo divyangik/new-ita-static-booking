@@ -311,14 +311,14 @@ section{position:relative}
 .field textarea{min-height:120px;resize:vertical}
 .field input:focus,.field select:focus,.field textarea:focus{box-shadow:inset 0 0 0 2px var(--red)}
 .dark .field input,.dark .field select,.dark .field textarea{background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px var(--line-dark);color:#fff}
-.dark .field select ion{color:var(--ink)}
+.dark .field select option{color:var(--ink)}
 .dark .field input::placeholder,.dark .field textarea::placeholder{color:rgba(255,255,255,.4)}
-.s{display:flex;flex-wrap:wrap;gap:8px}
-.s label{cursor:pointer;position:relative}
-.s input{position:absolute;opacity:0;pointer-events:none}
-.s span{display:inline-block;padding:10px 15px;border-radius:999px;font-size:14px;font-weight:600;box-shadow:inset 0 0 0 1px var(--line);background:#fff;transition:background .2s,color .2s}
-.dark .s span{background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px var(--line-dark)}
-.s input:checked+span{background:var(--red);color:#fff;box-shadow:none}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts label{cursor:pointer;position:relative}
+.opts input{position:absolute;opacity:0;pointer-events:none}
+.opts span{display:inline-block;padding:10px 15px;border-radius:999px;font-size:14px;font-weight:600;box-shadow:inset 0 0 0 1px var(--line);background:#fff;transition:background .2s,color .2s}
+.dark .opts span{background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px var(--line-dark)}
+.opts input:checked+span{background:var(--red);color:#fff;box-shadow:none}
 .form-ok{display:none;padding:26px;border-radius:var(--r);background:rgba(140,201,101,.15);font-weight:600}
 .form.sent{display:none}.form.sent+.form-ok{display:block}
 .contact-grid{display:grid;grid-template-columns:1fr 1.25fr;gap:clamp(30px,6vw,90px)}
