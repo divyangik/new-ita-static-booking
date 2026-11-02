@@ -225,6 +225,8 @@ $$('[data-rail]').forEach(el => {
   const exclude = el.dataset.exclude;
   let list = ITA_TRIPS.filter(t => (!f || f === 'all' || t.cat === f || t.region === f) && t.id !== exclude);
   if (ids.length) list = ids.map(i => ITA_TRIPS.find(t => t.id.startsWith(i))).filter(Boolean);
+  // Nothing to show (for example no Luxuria trips) -> hide the whole section instead of an empty rail
+  if (!list.length) { const sec = el.closest('section'); if (sec) sec.style.display = 'none'; return; }
   el.innerHTML = list.slice(0, +el.dataset.max || 12).map(tripCard).join('');
   observe(el);
 });

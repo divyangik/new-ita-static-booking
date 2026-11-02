@@ -87,6 +87,22 @@
 
   let dialogCount = 0;
 
+  // One place that writes the live price (from the admin app) into every spot on the page that shows "From $X"
+  const setPagePrice = (price, currency) => {
+    if (!(Number(price) > 0)) return;
+    const text = money(Number(price), currency || 'USD');
+    const card = document.querySelector('.td-book-card');
+    const top = card && card.querySelector('.td-book-top');
+    if (top) top.innerHTML = `<small>From</small><b>${text}</b><span>per person</span>`;
+    document.querySelectorAll('.td-subnav-cta b, .td-mobar b').forEach(el => { el.textContent = text; });
+    // Hero price: change only the amount and keep the "per person*" label next to it
+    document.querySelectorAll('.price dd').forEach(dd => {
+      const first = dd.firstChild;
+      if (first && first.nodeType === 3) first.nodeValue = `${text} `; else dd.prepend(document.createTextNode(`${text} `));
+    });
+  };
+  const cleanLabelEarly = text => (text && !/^(n\/?a|none|null|-+|—)$/i.test(String(text).trim()) ? String(text).trim() : '');
+
   // ---------- facts list under the price (Duration, destinations, hotels) ----------
   const renderTripCard = (mount, trip) => {
     const root = mount.closest('.td-book-card');
@@ -94,11 +110,7 @@
     if (!root || !card) return;
     const currency = card.currency || 'USD';
 
-    if (card.from_price) {
-      const top = root.querySelector('.td-book-top');
-      if (top) top.innerHTML = `<small>From</small><b>${money(card.from_price, currency)}</b><span>per person</span>`;
-      document.querySelectorAll('.td-subnav-cta b, .td-mobar b').forEach(el => { el.textContent = money(card.from_price, currency); });
-    }
+    if (card.from_price) setPagePrice(card.from_price, currency);
     const note = root.querySelector('.td-book-note');
     if (note) {
       note.textContent = card.price_note ? `*${card.price_note.replace(/^\*/, '')}` : '';
@@ -109,6 +121,23 @@
 
     const list = root.querySelector('.td-book-list');
     if (list) list.innerHTML = '';
+
+    // Tour type tags and What's included, as tags in the space under Duration
+    const T = trip.trip || {};
+    const groups = [['Tour type', T.tour_types, false], ["What's included", T.included, true]]
+      .map(([label, items, tick]) => [label, (items || []).filter(Boolean), tick]).filter(([, items]) => items.length);
+    let tags = root.querySelector('.tw-tg');
+    if (tags) tags.remove();
+    if (list && groups.length) {
+      tags = document.createElement('div');
+      tags.className = 'tw-tg';
+      tags.innerHTML = groups.map(([label, items, tick]) => `
+        <div class="tw-tg-group">
+          <p class="tw-tg-label">${esc(label)}</p>
+          <ul class="tw-tg-list">${items.map(name => `<li>${tick ? `<span class="tw-tick">${icons.check}</span>` : ''}${esc(name)}</li>`).join('')}</ul>
+        </div>`).join('');
+      list.after(tags);
+    }
   };
 
   const init = async mount => {
@@ -143,13 +172,27 @@
     const defaultDate = openDates.find(d => d.is_default) || openDates[0] || null;
 
     // Rows of Guests & Rooms: one per package type selected in the admin (or a plain Traveler row)
-    const childType = (T.traveller_types || []).find(t => /^child/i.test(t.value || t.name)) || null;
+    const isChildType = t => /^child/i.test(t.value || t.name);
+    const childType = (T.traveller_types || []).find(isChildType) || null;
     const isCouple = t => /^couple/i.test(t.value || t.name);
     const packageKinds = (T.package_types || []).length
       ? T.package_types.map(t => ({ key: `pkg:${t.value || t.name}`, type: isCouple(t) ? 'couple' : 'adult', label: t.name, name: t.name, sub: t.message || (isCouple(t) ? 'Couple room' : 'Double Occupancy'), mult: isCouple(t) ? 2 : 1, icon: icons.user }))
       : [{ key: 'adult', type: 'adult', label: '', name: 'Traveler', sub: 'Double Occupancy', mult: 1, icon: icons.user }];
-    const singleKind = { key: 'single', type: 'single', label: '', name: T.capacity.private_rooms_type || 'Private room', mult: 1, icon: icons.room };
-    const childKind = childType && T.capacity.child_allowed ? { key: 'child', type: 'child', label: '', name: T.capacity.child_room_type || childType.name || 'Child', sub: childType.message || 'Price per child', mult: 1, icon: icons.child } : null;
+    // Every other traveller type picked in the admin (Senior, Student...) becomes its own row, priced like an adult
+    const usedNames = new Set(packageKinds.map(k => String(k.name).toLowerCase()));
+    const travellerKinds = (T.traveller_types || [])
+      .filter(t => !isChildType(t) && !usedNames.has(String(t.name).toLowerCase()))
+      .map(t => ({ key: `trv:${t.value || t.name}`, type: 'adult', label: t.name, name: t.name, sub: t.message || 'Per traveler', mult: 1, icon: icons.user }));
+    const childKind = childType && T.capacity.child_allowed ? { key: 'child', type: 'child', label: '', name: childType.name || 'Child', sub: childType.message || 'Child under 18', mult: 1, icon: icons.child } : null;
+
+    // Rooms from the Capacity tab (Private rooms, Couple room, Child room). A row shows once its Type is filled in.
+    // "Count" is the most rooms a customer can book (0 = no limit).
+    const roomMax = count => (num(count) > 0 ? num(count) : 0);
+    const singleKind = { key: 'single', type: 'single', room: true, label: '', name: cleanLabelEarly(T.capacity.private_rooms_type) || 'Private room', sub: 'Single occupancy', mult: 1, max: roomMax(T.capacity.private_rooms_count), icon: icons.room };
+    const coupleRoomKind = cleanLabelEarly(T.capacity.couple_room_type)
+      ? { key: 'room:couple', type: 'couple', room: true, label: T.capacity.couple_room_type, name: T.capacity.couple_room_type, sub: 'Room for 2 travelers', mult: 2, max: roomMax(T.capacity.couple_room_count), icon: icons.room } : null;
+    const childRoomKind = cleanLabelEarly(T.capacity.child_room_type) && T.capacity.child_allowed
+      ? { key: 'room:child', type: 'child', room: true, label: T.capacity.child_room_type, name: T.capacity.child_room_type, sub: 'Room for a child', mult: 1, max: roomMax(T.capacity.child_room_count), icon: icons.child } : null;
 
     const state = {
       dateId: defaultDate ? String(defaultDate.id) : '',
@@ -178,11 +221,19 @@
       if (!item) { item = document.createElement('li'); item.dataset.fact = 'duration'; item.innerHTML = '<span>Duration</span><b></b>'; list.prepend(item); }
       item.querySelector('b').textContent = text;
     };
-    const allKinds = () => [...packageKinds, singleKind, childKind].filter(Boolean);
+    const allKinds = () => [...packageKinds, ...travellerKinds, childKind, singleKind, coupleRoomKind, childRoomKind].filter(Boolean);
+    const kindMax = kind => kind.max > 0 ? Math.min(kind.max, ROW_MAX) : ROW_MAX;
+    // Private room shows when the admin named it, gave it a price, or the date has a single supplement
+    const singleVisible = () => !!cleanLabelEarly(T.capacity.private_rooms_type) || num(T.capacity.private_rooms_price) > 0 || unitPrices().single > 0;
     const qtyOf = kind => state.counts[kind.key] || 0;
     const travelers = () => allKinds().reduce((n, kind) => n + qtyOf(kind) * kind.mult, 0);
     const adultCount = () => allKinds().filter(kind => kind.type !== 'child').reduce((n, kind) => n + qtyOf(kind) * kind.mult, 0);
-    const pricePer = (kind, u) => (kind.type === 'couple' ? u.adult * 2 : kind.type === 'single' ? u.adult + u.single : kind.type === 'child' ? u.child : u.adult);
+    const pricePer = (kind, u) => {
+      if (kind.type === 'couple') return u.adult * 2 + (kind.room ? num(T.capacity.couple_room_price) : 0);
+      if (kind.type === 'single') return u.adult + u.single;
+      if (kind.type === 'child') return u.child + (kind.room ? num(T.capacity.child_room_price) : 0);
+      return u.adult;
+    };
     const seatLimit = () => { const d = date(); return d && d.seats_total > 0 ? d.seats_available : Infinity; };
     const guestCap = () => seatLimit();
     // The admin sets the maximum in the dashboard (Max quantity). 0 means no limit, up to a safety cap.
@@ -190,8 +241,10 @@
     const unitPrices = () => {
       const d = date();
       const p = num(T.pricing.price_per_person);
-      if (d) { const adult = num(d.adult_price) || p; return { adult, child: num(d.child_price) || adult, single: num(d.single_supplement) }; }
-      return { adult: p, child: p, single: 0 };
+      const single = num(T.capacity.private_rooms_price) || (d ? num(d.single_supplement) : 0);
+      // Pricing tab price first; the date's own price is only a fallback
+      if (d) { const adult = p || num(d.adult_price); return { adult, child: num(d.child_price) || adult, single }; }
+      return { adult: p, child: p, single };
     };
     const estimate = () => {
       const d = date();
@@ -210,7 +263,7 @@
     const buildPayload = contact => ({
       shopify_product_id: productId,
       date_id: date() ? date().id : null,
-      rows: allKinds().filter(kind => qtyOf(kind) > 0).map(kind => ({ type: kind.type, qty: qtyOf(kind), ...(kind.label ? { label: kind.label } : {}) })),
+      rows: allKinds().filter(kind => qtyOf(kind) > 0).map(kind => ({ type: kind.type, qty: qtyOf(kind), ...(kind.label ? { label: kind.label } : {}), ...(kind.room ? { room: true } : {}) })),
       addons: addons.filter(a => state.addons[a.id] > 0).map(a => ({ id: a.id, qty: state.addons[a.id] })),
       payment_type: state.pay === 'full' ? 'full' : 'deposit',
       contact
@@ -258,13 +311,10 @@
           <div class="tw-city end"><b>${esc(endCity || '—')}</b>${d ? `<span>${dmy(d.return_date)}</span>` : ''}<small>Tour ends</small></div>
         </div>`;
 
-      const visibleKinds = allKinds().filter(kind => kind !== singleKind || (d && u.single > 0));
-      const guestRows = visibleKinds.map(kind => {
-        const price = pricePer(kind, u);
-        const sub = kind === singleKind ? `Single occupancy · +${money(u.single, currency)} supplement` : kind.sub;
-        return row({ icon: kind.icon, name: kind.name, sub, price: price > 0 ? money(price, currency) : '',
-          step: stepper(kind.name, `data-guest="${esc(kind.key)}"`, qtyOf(kind), qtyOf(kind) > 0 && n - kind.mult >= minGuests, qtyOf(kind) < ROW_MAX && n + kind.mult <= cap) });
-      });
+      const visibleKinds = allKinds().filter(kind => kind !== singleKind || singleVisible());
+      // Prices are not shown per row. The customer sees the total below.
+      const guestRows = visibleKinds.map(kind => row({ icon: kind.icon, name: kind.name, sub: kind.sub, price: '',
+        step: stepper(kind.name, `data-guest="${esc(kind.key)}"`, qtyOf(kind), qtyOf(kind) > 0 && n - kind.mult >= minGuests, qtyOf(kind) < kindMax(kind) && n + kind.mult <= cap) }));
 
       const extras = addons.length ? `
         <section class="tw-sec">
@@ -326,11 +376,20 @@
         </div>`;
     };
 
+    // The big price at the top follows the chosen tour date (adult price of that date)
+    const updateTopPrice = () => {
+      const d = date();
+      const price = num(T.pricing.price_per_person) || (d ? num(d.adult_price) : 0);
+      if (!(price > 0)) return;
+      setPagePrice(price, currency);
+    };
+
     const renderWidget = () => {
       const focusKey = document.activeElement && mount.contains(document.activeElement) ? document.activeElement.dataset.fk : null;
       mount.innerHTML = widgetView();
       if (focusKey) { const el = mount.querySelector(`[data-fk="${focusKey}"]`); if (el) el.focus(); }
       setDurationFact(durationText());
+      updateTopPrice();
     };
 
     // ---------- the pop-up (details, review, enquiry, itinerary) ----------
@@ -550,7 +609,7 @@
         if (kind) {
           const next = qtyOf(kind) + delta;
           const total = travelers() + delta * kind.mult;
-          if (next >= 0 && next <= ROW_MAX && total >= minGuests && total <= guestCap()) state.counts[kind.key] = next;
+          if (next >= 0 && next <= kindMax(kind) && total >= minGuests && total <= guestCap()) state.counts[kind.key] = next;
         }
         state.error = '';
         renderWidget();
@@ -580,7 +639,7 @@
       if (field.name === 'dateId') {
         state.dateId = field.value;
         const d = date();
-        if (d && !(num(d.single_supplement) > 0)) state.counts.single = 0;
+        if (!singleVisible()) state.counts.single = 0;
         const first = packageKinds[0];
         while (travelers() > guestCap() && qtyOf(first) > 1) state.counts[first.key] -= 1;
       } else if (field.name === 'pay') {

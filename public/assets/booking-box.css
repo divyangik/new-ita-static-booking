@@ -196,3 +196,11 @@
 .tw-tags li { padding: 5px 12px; border-radius: 99px; background: var(--tw-soft); border: 1px solid var(--tw-line); font-size: 12px; font-weight: 700; color: var(--tw-ink); }
 .tw-tags p { margin: 0; font-size: 12.5px; color: var(--tw-muted); }
 .tw-tags p b { color: var(--tw-ink); }
+
+/* Tour type + What's included tags (under Duration in the card) */
+.tw-tg { display: grid; gap: 16px; margin: -6px 0 18px; }
+.tw-tg-label { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted, #5b6080); }
+.tw-tg-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+.tw-tg-list li { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line, rgba(11,19,64,.12)); background: var(--cream, #f5f2ec); font-size: 12.5px; font-weight: 600; line-height: 1.3; color: var(--ink, #070c2b); }
+.tw-tg .tw-tick { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #e6f1de; color: #4f7d3a; }
+.tw-tg .tw-tick svg { width: 10px; height: 10px; }
