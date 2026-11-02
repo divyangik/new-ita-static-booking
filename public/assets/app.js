@@ -210,7 +210,8 @@ if (mapc && window.ITA_LAND) {
 /* ---------- trips ---------- */
 const tripPages = {
   'boquete-panama-real-estate-lifestyle-discovery-1': '/trips/boquete-panama-real-estate-lifestyle-discovery',
-  'japan-a-journey-through-cultural-depth-timeless-elegance-1': '/trips/japan-a-journey-through-cultural-depth-timeless-elegance'
+  'japan-a-journey-through-cultural-depth-timeless-elegance-1': '/trips/japan-a-journey-through-cultural-depth-timeless-elegance',
+  'treasures-of-thailand-an-exclusive-couples-journey': '/trips/treasures-of-thailand-an-exclusive-couples-journey'
 };
 const tripLink = t => tripPages[t.id] ? `href="${tripPages[t.id]}"` : `href="${t.url}" target="_blank" rel="noopener"`;
 const tripCard = t => `

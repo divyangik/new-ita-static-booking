@@ -281,9 +281,9 @@ input[type="range"]::-webkit-slider-thumb { background: var(--gold); }
 .field label { font-size: 13px; font-weight: 500; letter-spacing: .02em; }
 .field input, .field select, .field textarea { border-radius: 8px; font-size: 16px; padding: 15px 16px; }
 .field input:focus, .field select:focus, .field textarea:focus { box-shadow: inset 0 0 0 1px var(--gold); }
-.opts span { border-radius: 8px; font-size: 13px; padding: 10px 14px; }
-.opts input:checked + span { background: var(--gold); color: var(--ink); }
-.opts input:focus-visible + span, .tg input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 4px; }
+.s span { border-radius: 8px; font-size: 13px; padding: 10px 14px; }
+.s input:checked + span { background: var(--gold); color: var(--ink); }
+.s input:focus-visible + span, .tg input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 4px; }
 .form-error { color: #f2c7b0; font-size: 12px; line-height: 1.7; margin-top: 16px; }
 .sub + .form-ok { margin-top: 10px; }
 .sub.sent + .form-ok { display: block; }

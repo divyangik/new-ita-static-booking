@@ -42,15 +42,15 @@
   };
 
   // Details for the trip card (price, duration, cities, dates...). Works even when no dates are open.
-  const loadCard = async (baseOptions, apiBase) => {
-    const productId = baseOptions.commerce.productId;
+  const loadCard = async (baseions, apiBase) => {
+    const productId = baseions.commerce.productId;
     if (!productId) return null;
     const trip = await getTrip(productId, apiBase);
     return trip && trip.view && trip.card ? trip.card : null;
   };
 
-  const loadOptions = async (baseOptions, apiBase) => {
-    const productId = baseOptions.commerce.productId;
+  const loadions = async (baseions, apiBase) => {
+    const productId = baseions.commerce.productId;
     if (!productId) return null;
 
     const trip = await getTrip(productId, apiBase);
@@ -72,7 +72,7 @@
     const departureIds = {};
     fixedDepartures.forEach(date => { departureIds[date] = departures[date].id; });
 
-    const maxTravelers = Number(trip.max_group_size) > 0 ? Number(trip.max_group_size) : baseOptions.maxTravelers;
+    const maxTravelers = Number(trip.max_group_size) > 0 ? Number(trip.max_group_size) : baseions.maxTravelers;
     const minTravelers = Math.min(Math.max(Number(trip.min_group_size) || 1, 1), maxTravelers);
 
     // Extras (add-ons) that are switched on in the admin app
@@ -87,12 +87,12 @@
       }));
 
     return {
-      ...baseOptions,
+      ...baseions,
       rich: true,
       card: trip.card || null,
-      tripTitle: trip.title || baseOptions.tripTitle,
+      tripTitle: trip.title || baseions.tripTitle,
       depositPerTraveler: Number(trip.deposit_per_person || 0),
-      currency: trip.currency || baseOptions.currency,
+      currency: trip.currency || baseions.currency,
       minTravelers,
       maxTravelers,
       childAllowed: trip.child_allowed !== false,
@@ -100,7 +100,7 @@
       departures,
       addons,
       isSample: false,
-      commerce: { ...baseOptions.commerce, departureIds }
+      commerce: { ...baseions.commerce, departureIds }
     };
   };
 
@@ -171,6 +171,6 @@
   };
 
   window.ITAShopify = Object.assign(window.ITAShopify || {}, {
-    booking: { loadOptions, loadCard, quote, createDepositReservation }
+    booking: { loadions, loadCard, quote, createDepositReservation }
   });
 })();

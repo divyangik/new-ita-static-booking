@@ -295,7 +295,7 @@
 
       const dateBlock = fixedMode ? `
         <label class="tw-field"><span>Tour date</span>
-          <select name="dateId" data-fk="date">${openDates.map(x => `<option value="${x.id}" ${String(x.id) === state.dateId ? 'selected' : ''}>${dmy(x.departure_date)}${x.status === 'Guaranteed' ? ' · Guaranteed departure' : ''}</option>`).join('')}</select>
+          <select name="dateId" data-fk="date">${openDates.map(x => `<ion value="${x.id}" ${String(x.id) === state.dateId ? 'selected' : ''}>${dmy(x.departure_date)}${x.status === 'Guaranteed' ? ' · Guaranteed departure' : ''}</ion>`).join('')}</select>
         </label>
         ${d && d.seats_total > 0 && d.seats_available <= 10 ? `<p class="tw-seats">Only ${plural(d.seats_available, 'seat')} left on this date</p>` : ''}`
         : `<div class="tw-dates">
@@ -318,12 +318,12 @@
 
       const extras = addons.length ? `
         <section class="tw-sec">
-          <div class="tw-sec-head"><h4>Extras</h4><span>Optional</span></div>
+          <div class="tw-sec-head"><h4>Extras</h4><span>ional</span></div>
           ${addons.map((a, position) => {
             const qty = state.addons[a.id] || 0;
             const look = extraLook(a.addon_name, position);
             const limit = num(a.max_qty) > 0 ? `Up to ${num(a.max_qty)}` : '';
-            const sub = [a.description, limit].filter(Boolean).join(' · ') || 'Optional extra';
+            const sub = [a.description, limit].filter(Boolean).join(' · ') || 'ional extra';
             return row({ icon: look.icon, tone: `background:${look.bg};color:${look.fg};border-color:transparent`, name: a.addon_name, sub, price: money(num(a.price), currency),
               step: stepper(a.addon_name, `data-addon="${esc(a.id)}"`, qty, qty > 0, qty < addonMax(a)) });
           }).join('')}
@@ -334,16 +334,16 @@
           <div class="tw-sec-head"><h4>Payment</h4></div>
           <div class="tw-pay">
             ${depositPer > 0 ? `
-            <label class="tw-opt ${state.pay === 'deposit' ? 'is-on' : ''}">
+            <label class="tw- ${state.pay === 'deposit' ? 'is-on' : ''}">
               <input type="radio" name="pay" value="deposit" data-fk="pay-deposit" ${state.pay === 'deposit' ? 'checked' : ''}>
-              <span class="tw-opt-main"><b>${esc(T.payment.option_label || 'I want to Deposit')}</b>
+              <span class="tw--main"><b>${esc(T.payment.ion_label || 'I want to Deposit')}</b>
                 <small>${est ? `${money(est.depositBalance, currency)} balance paid later.` : 'Balance paid later.'}${installments > 1 && est && est.depositBalance > 0 ? `<br>(You can pay it in easy installments like ${money(est.depositBalance / installments, currency)} × ${installments})` : ''}</small></span>
-              <span class="tw-opt-amt">${est ? money(est.depositNow, currency) : money(depositPer * n, currency)}</span>
+              <span class="tw--amt">${est ? money(est.depositNow, currency) : money(depositPer * n, currency)}</span>
             </label>` : ''}
-            <label class="tw-opt ${state.pay === 'full' ? 'is-on' : ''}">
+            <label class="tw- ${state.pay === 'full' ? 'is-on' : ''}">
               <input type="radio" name="pay" value="full" data-fk="pay-full" ${state.pay === 'full' ? 'checked' : ''}>
-              <span class="tw-opt-main"><b>Full Price</b><small>I want to pay full payment.</small>${T.payment.show_deal_price_badge ? '<em class="tw-badge">Best price</em>' : ''}</span>
-              <span class="tw-opt-amt">${est ? money(est.total, currency) : '—'}</span>
+              <span class="tw--main"><b>Full Price</b><small>I want to pay full payment.</small>${T.payment.show_deal_price_badge ? '<em class="tw-badge">Best price</em>' : ''}</span>
+              <span class="tw--amt">${est ? money(est.total, currency) : '—'}</span>
             </label>
           </div>
         </section>`;
@@ -459,7 +459,7 @@
         return `${banner('Itinerary', 'Get the day-by-day plan')}
           <form class="tw-d-body" novalidate>
             <p class="tw-lead">We will email the full itinerary to your inbox.</p>
-            ${dField('Your name (optional)', 'name', 'text', 'user', 'autocomplete="name" placeholder="Jane Smith"')}
+            ${dField('Your name (ional)', 'name', 'text', 'user', 'autocomplete="name" placeholder="Jane Smith"')}
             ${dField('Email', 'email', 'email', 'mail', 'autocomplete="email" inputmode="email" placeholder="jane@example.com"')}
             ${error}
             <button type="submit" class="tw-btn tw-primary tw-wide" ${dlg.busy ? 'disabled' : ''}>${dlg.busy ? 'Sending…' : `Send itinerary <i class="tw-btn-i">${fieldIcons.arrow}</i>`}</button>
@@ -475,7 +475,7 @@
             ${dField('Phone / WhatsApp', 'phone', 'tel', 'phone', 'autocomplete="tel" inputmode="tel" placeholder="+1 555 010 0000"')}
           </div>
           ${dField('Email', 'email', 'email', 'mail', 'autocomplete="email" inputmode="email" placeholder="jane@example.com"')}
-          ${isEnquiry ? `<label class="tw-f"><span class="tw-f-l">Your message <em class="tw-opt-tag">optional</em></span>
+          ${isEnquiry ? `<label class="tw-f"><span class="tw-f-l">Your message <em class="tw--tag">ional</em></span>
               <span class="tw-f-w tw-f-area"><i class="tw-f-i">${fieldIcons.chat}</i><textarea name="message" data-fk="message" rows="4" placeholder="Dates, special requests, questions…">${esc(dlg.message)}</textarea></span></label>`
             : `<label class="tw-check"><input type="checkbox" name="policy" data-fk="policy" ${dlg.policy ? 'checked' : ''} ${dlg.errors.policy ? 'aria-invalid="true"' : ''}><span>I have read the <a href="#policies" data-policy>cancellation policy</a> for this journey.</span></label>${dlg.errors.policy ? `<em class="tw-ferr">${esc(dlg.errors.policy)}</em>` : ''}`}
           ${error}

@@ -15,8 +15,8 @@ The trip pages load them in this order (all `defer`): `mock/booking.mock.js`, `s
 ## Service contract
 
 ```
-ITAServices.booking.readBookingOptions(mountElement) -> BookingOptions
-ITAServices.booking.validateDepositRequest(request, options) -> { field: message }
+ITAServices.booking.readBookingions(mountElement) -> Bookingions
+ITAServices.booking.validateDepositRequest(request, ions) -> { field: message }
 ITAServices.booking.createDepositReservation(request) -> Promise<Reservation>
 ```
 
@@ -35,7 +35,7 @@ ITAServices.booking.createDepositReservation(request) -> Promise<Reservation>
   depositPerTraveler, depositDue, currency, createdAt }
 ```
 
-On failure, reject with an `Error` whose `message` is safe to show the customer (optional `code`). The dialog shows it, keeps the customer's details and offers "Try again".
+On failure, reject with an `Error` whose `message` is safe to show the customer (ional `code`). The dialog shows it, keeps the customer's details and offers "Try again".
 
 ## Testing the failure state
 
@@ -47,8 +47,8 @@ Append `?mock=fail` to either trip URL. Confirming then shows the error alert an
 2. Switch `config.dataMode`.
 3. Keep the UI untouched. It only depends on the contract above.
 
-Booking options (deposit, currency, max travelers, fixed departures) currently come from `data-*` attributes on `[data-ita-booking]`. In Phase 3, `readBookingOptions` can fetch them from the API by `data-trip` instead.
+Booking ions (deposit, currency, max travelers, fixed departures) currently come from `data-*` attributes on `[data-ita-booking]`. In Phase 3, `readBookingions` can fetch them from the API by `data-trip` instead.
 
 ## Images
 
-Photos on both trip pages are served from `img/trips/<trip>/opt/<name>-{800,1600[,2400]}.jpg` via `srcset`. Originals are kept, and the lightbox still opens originals through Netlify Image CDN.
+Photos on both trip pages are served from `img/trips/<trip>//<name>-{800,1600[,2400]}.jpg` via `srcset`. Originals are kept, and the lightbox still opens originals through Netlify Image CDN.

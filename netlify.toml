@@ -15,7 +15,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Content-Type-Options = "nosniff"
+    X-Content-Type-ions = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
 [[redirects]]
@@ -26,4 +26,9 @@
 [[redirects]]
   from = "/products/japan-a-journey-through-cultural-depth-timeless-elegance-1"
   to = "/trips/japan-a-journey-through-cultural-depth-timeless-elegance"
+  status = 301
+
+[[redirects]]
+  from = "/products/treasures-of-thailand-an-exclusive-couples-journey"
+  to = "/trips/treasures-of-thailand-an-exclusive-couples-journey"
   status = 301

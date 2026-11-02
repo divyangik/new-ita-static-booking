@@ -13,7 +13,7 @@
 ## New files
 - `public/assets/services/ita-services.js`: data-access layer used by the dialog.
 - `public/assets/mock/booking.mock.js`: sample-data adapter.
-- `public/img/trips/japan/opt/` (29 files) and `public/img/trips/boquete/opt/` (37 files): resized copies of the original photos.
+- `public/img/trips/japan//` (29 files) and `public/img/trips/boquete//` (37 files): resized copies of the original photos.
 - `docs/frontend-services.md`: service contract and Phase 3 notes.
 - `docs/phase1-changes.md`: this file.
 
