@@ -62,7 +62,7 @@
     [/gift|souvenir|welcome|hamper/i, 'gift'], [/boat|cruise|ferry|sail|yacht/i, 'boat'], [/upgrade|vip|premium|luxury|first.?class/i, 'crown'],
     [/class|lesson|workshop|course|learn/i, 'book']
   ];
-  const tones = [['#fdecee', '#c9606a'], ['#e8f1fb', '#3c78b5'], ['#e9f4e3', '#5a8a43'], ['#fbf1de', '#b27a1f'], ['#efeaf8', '#6a58a0'], ['#e4f3f1', '#2f8a80']];
+  const tones = [['#fdecee', '#ee364c'], ['#e8f1fb', '#3c78b5'], ['#e9f4e3', '#5a8a43'], ['#fbf1de', '#b27a1f'], ['#efeaf8', '#6a58a0'], ['#e4f3f1', '#2f8a80']];
   const fallbackIcons = ['sparkle', 'gift', 'heart', 'crown'];
   const extraLook = (name, position) => {
     const rule = iconRules.find(([pattern]) => pattern.test(name));
@@ -260,13 +260,28 @@
     const travelerSummary = () => allKinds().filter(kind => qtyOf(kind) > 0)
       .map(kind => `${qtyOf(kind)} ${kind.name}${kind.type === 'couple' ? ' (2 travelers)' : ''}`).join(', ');
     const extrasSummary = () => addons.filter(a => state.addons[a.id] > 0).map(a => `${state.addons[a.id]} × ${a.addon_name}`).join(', ');
+    // One slot per person on the trip, in order (a couple room = 2 people). Used for the traveler forms.
+    const travelerSlots = () => {
+      const slots = [];
+      allKinds().forEach(kind => {
+        for (let i = 0; i < qtyOf(kind) * kind.mult; i++) slots.push({ label: kind.type === 'couple' ? (kind.label || 'Couple') : (kind.label || (kind.type === 'child' ? kind.name : '')) });
+      });
+      return slots;
+    };
+    const syncGuests = () => {
+      const need = Math.max(travelerSlots().length - 1, 0);
+      while (dlg.guests.length < need) dlg.guests.push({ name: '', email: '', phone: '' });
+      dlg.guests.length = need;
+    };
     const buildPayload = contact => ({
       shopify_product_id: productId,
       date_id: date() ? date().id : null,
       rows: allKinds().filter(kind => qtyOf(kind) > 0).map(kind => ({ type: kind.type, qty: qtyOf(kind), ...(kind.label ? { label: kind.label } : {}), ...(kind.room ? { room: true } : {}) })),
       addons: addons.filter(a => state.addons[a.id] > 0).map(a => ({ id: a.id, qty: state.addons[a.id] })),
       payment_type: state.pay === 'full' ? 'full' : 'deposit',
-      contact
+      contact,
+      // Traveler 1 = the person booking, then one entry for every other traveler
+      travelers: [{ ...contact, type: (travelerSlots()[0] || {}).label || '' }, ...dlg.guests.map((g, i) => ({ name: g.name.trim(), email: g.email.trim(), phone: g.phone.trim(), type: (travelerSlots()[i + 1] || {}).label || '' }))]
     });
 
     // ---------- the widget (inline in the page) ----------
@@ -400,7 +415,7 @@
     dialog.setAttribute('aria-labelledby', `${dialogId}-title`);
     document.body.append(dialog);
 
-    const dlg = { mode: 'reserve', step: 'details', name: '', email: '', phone: '', message: '', policy: false, errors: {}, error: '', busy: false, quote: null, done: '' };
+    const dlg = { mode: 'reserve', step: 'details', name: '', email: '', phone: '', message: '', policy: false, errors: {}, error: '', busy: false, quote: null, done: '', guests: [] };
     const dField = (label, name, type, icon, extra = '') => `
       <label class="tw-f">
         <span class="tw-f-l">${label}</span>
@@ -432,11 +447,29 @@
         <p>${esc(title)}</p>
       </header>`;
 
+    const guestForms = () => {
+      if (dlg.mode !== 'reserve' || !dlg.guests.length) return '';
+      const slots = travelerSlots();
+      const gField = (i, key, label, type, extra) => {
+        const err = dlg.errors[`g${i}_${key}`];
+        return `<label class="tw-f"><span class="tw-f-l">${label}</span>
+          <span class="tw-f-w ${err ? 'is-bad' : ''}"><input type="${type}" data-g="${i}" data-gf="${key}" data-fk="g${i}_${key}" value="${esc(dlg.guests[i][key])}" ${extra} ${err ? 'aria-invalid="true"' : ''}></span>
+          ${err ? `<em class="tw-ferr">${esc(err)}</em>` : ''}</label>`;
+      };
+      return `<div class="tw-guests"><p class="tw-lead">Details for the other ${plural(dlg.guests.length, 'traveler')}</p>
+        ${dlg.guests.map((g, i) => `<fieldset class="tw-guest"><legend>Traveler ${i + 2}${slots[i + 1] && slots[i + 1].label ? ` · ${esc(slots[i + 1].label)}` : ''}</legend>
+          ${gField(i, 'name', 'Full name', 'text', 'autocomplete="off" placeholder="As on passport"')}
+          <div class="tw-f-grid">${gField(i, 'phone', 'Phone <em class="tw-opt-tag">optional</em>', 'tel', 'inputmode="tel" placeholder="+1 555 010 0000"')}
+          ${gField(i, 'email', 'Email <em class="tw-opt-tag">optional</em>', 'email', 'inputmode="email" placeholder="name@example.com"')}</div>
+        </fieldset>`).join('')}</div>`;
+    };
+
     const reviewView = () => {
       const q = dlg.quote;
       return `
         <h3 class="tw-d-title" tabindex="-1" id="${dialogId}-title">Review your booking</h3>
         ${selectionSummary()}
+        <ul class="tw-lines tw-people">${[{ name: dlg.name.trim() }, ...dlg.guests].map((g, i) => `<li><span>Traveler ${i + 1}</span><b>${esc(g.name.trim())}</b></li>`).join('')}</ul>
         <ul class="tw-lines">${q.lines.map(l => `<li><span>${esc(l.label)} × ${l.qty}</span><b>${money(num(l.amount), currency)}</b></li>`).join('')}</ul>
         <div class="tw-total"><span>Trip total</span><b>${money(num(q.total), currency)}</b></div>
         <div class="tw-total due"><span>${q.payment_type === 'deposit' ? 'Deposit due now' : 'Due now'}</span><b>${money(num(q.due_now), currency)}</b></div>
@@ -475,6 +508,7 @@
             ${dField('Phone / WhatsApp', 'phone', 'tel', 'phone', 'autocomplete="tel" inputmode="tel" placeholder="+1 555 010 0000"')}
           </div>
           ${dField('Email', 'email', 'email', 'mail', 'autocomplete="email" inputmode="email" placeholder="jane@example.com"')}
+          ${guestForms()}
           ${isEnquiry ? `<label class="tw-f"><span class="tw-f-l">Your message <em class="tw-opt-tag">optional</em></span>
               <span class="tw-f-w tw-f-area"><i class="tw-f-i">${fieldIcons.chat}</i><textarea name="message" data-fk="message" rows="4" placeholder="Dates, special requests, questions…">${esc(dlg.message)}</textarea></span></label>`
             : `<label class="tw-check"><input type="checkbox" name="policy" data-fk="policy" ${dlg.policy ? 'checked' : ''} ${dlg.errors.policy ? 'aria-invalid="true"' : ''}><span>I have read the <a href="#policies" data-policy>cancellation policy</a> for this journey.</span></label>${dlg.errors.policy ? `<em class="tw-ferr">${esc(dlg.errors.policy)}</em>` : ''}`}
@@ -492,6 +526,7 @@
 
     const openDialog = mode => {
       Object.assign(dlg, { mode, step: 'details', errors: {}, error: '', busy: false, quote: null, done: '' });
+      if (mode === 'reserve') syncGuests(); else dlg.guests = [];
       document.documentElement.classList.add('tw-lock');
       renderDialog();
       if (!dialog.open) dialog.showModal();
@@ -526,10 +561,17 @@
       if (dlg.busy) return;
       const needPhone = dlg.mode !== 'itinerary';
       const errors = validateContact(needPhone);
+      if (dlg.mode === 'reserve') {
+        dlg.guests.forEach((g, i) => {
+          if (!g.name.trim()) errors[`g${i}_name`] = `Add the full name of traveler ${i + 2}.`;
+          if (g.email.trim() && !emailPattern.test(g.email.trim())) errors[`g${i}_email`] = 'Add a valid email address.';
+          if (g.phone.trim() && (!phonePattern.test(g.phone.trim()) || g.phone.replace(/\D/g, '').length < 7)) errors[`g${i}_phone`] = 'Add a valid phone number.';
+        });
+      }
       if (dlg.mode === 'reserve' && !dlg.policy) errors.policy = 'Please confirm you have read the cancellation policy.';
       dlg.errors = errors;
       dlg.error = '';
-      if (Object.keys(errors).length) { renderDialog(`[name="${Object.keys(errors)[0]}"]`); return; }
+      if (Object.keys(errors).length) { renderDialog(`[data-fk="${Object.keys(errors)[0]}"], [name="${Object.keys(errors)[0]}"]`); return; }
       dlg.busy = true;
       renderDialog();
       try {
@@ -567,6 +609,7 @@
 
     dialog.addEventListener('input', event => {
       const field = event.target;
+      if (field.dataset.g !== undefined) { dlg.guests[Number(field.dataset.g)][field.dataset.gf] = field.value; return; }
       if (field.name in dlg && field.type !== 'checkbox') dlg[field.name] = field.value;
       if (field.name === 'policy') { dlg.policy = field.checked; if (field.checked && dlg.errors.policy) { delete dlg.errors.policy; } }
     });

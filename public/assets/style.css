@@ -1,7 +1,7 @@
 /* ITA Global — redesign. Brand: navy + coral red + pixel-globe spectrum */
 :root{
   --ink:#070c2b; --navy:#0b1340; --indigo:#282c69; --indigo-2:#393868;
-  --red:#c9606a; --red-2:#e3959b; --orange:#d98a5b; --yellow:#d9b75a; --blue:#5f9fcf; --green:#8fb878; --purple:#7b6aa8;
+  --red:#ee364c; --red-2:#ee364c; --orange:#f07622; --yellow:#ecdc25; --blue:#01a1dd; --green:#91ca64; --purple:#732a82;
   --cream:#f5f2ec; --paper:#fbfaf7; --line:rgba(11,19,64,.12); --muted:#5b6080;
   --on-dark:#eef0ff; --on-dark-muted:rgba(238,240,255,.62); --line-dark:rgba(255,255,255,.12);
   --r:22px; --r-lg:34px;
@@ -38,7 +38,7 @@ h1,h2,h3{font-weight:600;letter-spacing:-.04em;line-height:1.02}
 
 /* ---------- buttons ---------- */
 .btn{--bg:var(--red);--fg:#fff;display:inline-flex;align-items:center;gap:10px;padding:16px 26px;border-radius:999px;background:var(--bg);color:var(--fg);font-weight:700;font-size:15px;border:0;cursor:pointer;transition:transform .35s var(--ease),box-shadow .35s var(--ease),background .25s;white-space:nowrap;position:relative;overflow:hidden}
-.btn:hover{transform:translateY(-2px);box-shadow:0 14px 34px -12px rgba(201,96,106,.45)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 34px -12px rgba(238,54,76,.45)}
 .btn .arr{display:inline-block;transition:transform .35s var(--ease)}
 .btn:hover .arr{transform:translateX(4px)}
 .btn.ghost{--bg:transparent;--fg:currentColor;box-shadow:inset 0 0 0 1.5px currentColor}
@@ -146,7 +146,7 @@ section{position:relative}
 .div .go{position:absolute;top:24px;right:24px;width:54px;height:54px;border-radius:50%;background:#fff;color:var(--ink);display:grid;place-items:center;font-size:20px;transform:rotate(-45deg);transition:transform .5s var(--ease),background .3s}
 .div:hover .go{transform:rotate(0);background:var(--red);color:#fff}
 .div h3{font-weight:600;font-size:clamp(30px,3.2vw,46px);letter-spacing:-.035em;line-height:1}
-.div em{color:#f0b4b8}
+.div em{color:#ee364c}
 .div p{opacity:.8;margin-top:12px;max-width:420px}
 
 /* ---------- stats ---------- */
@@ -350,7 +350,7 @@ section{position:relative}
 .seg button.on{background:#fff;box-shadow:0 6px 18px -8px rgba(11,19,64,.35);color:var(--ink)}
 .seg button.on small{opacity:.8}
 input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:9px;background:linear-gradient(90deg,var(--red) var(--p,50%),#e6e2da var(--p,50%));outline:0;cursor:pointer}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px var(--red),0 6px 14px -4px rgba(201,96,106,.4);cursor:grab}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px var(--red),0 6px 14px -4px rgba(238,54,76,.4);cursor:grab}
 input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid var(--red);cursor:grab}
 .scale{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:8px}
 .toggles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -417,7 +417,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;bac
 .ftr ul a:hover{opacity:1;color:var(--red-2)}
 .ftr .sub{display:flex;gap:8px;margin-top:22px;max-width:400px}
 .ftr .sub input{flex:1;min-width:0;padding:14px 18px;border-radius:999px;border:0;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--line-dark);color:#fff;outline:0}
-.ftr .giant{font-size:clamp(60px,16.5vw,270px);font-weight:700;letter-spacing:-.06em;line-height:.8;margin:60px 0 30px;background:linear-gradient(90deg,#c9606a,#d98a5b 30%,#d9b75a 50%,#8fb878 68%,#5f9fcf 85%,#7b6aa8);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:.95;white-space:nowrap}
+.ftr .giant{font-size:clamp(60px,16.5vw,270px);font-weight:700;letter-spacing:-.06em;line-height:.8;margin:60px 0 30px;background:linear-gradient(90deg,#ee364c,#f07622 30%,#ecdc25 50%,#91ca64 68%,#01a1dd 85%,#732a82);-webkit-background-clip:text;background-clip:text;color:transparent;opacity:.95;white-space:nowrap}
 .ftr .bot{display:flex;justify-content:space-between;gap:20px;font-size:13px;color:var(--on-dark-muted);flex-wrap:wrap}
 .ftr .bot p{max-width:760px}
 .soc{display:flex;gap:10px;margin-top:26px}

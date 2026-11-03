@@ -4,7 +4,7 @@
 .td-book-card [data-ita-booking] { margin-top: 4px; }
 .tw-lock { overflow: hidden; }
 
-.tw { --tw-line: var(--line, rgba(11,19,64,.12)); --tw-ink: var(--ink, #070c2b); --tw-muted: var(--muted, #5b6080); --tw-accent: var(--red, #c9606a); --tw-navy: var(--indigo, #282c69); --tw-soft: var(--cream, #f5f2ec);
+.tw { --tw-line: var(--line, rgba(11,19,64,.12)); --tw-ink: var(--ink, #070c2b); --tw-muted: var(--muted, #5b6080); --tw-accent: var(--red, #ee364c); --tw-navy: var(--indigo, #282c69); --tw-soft: var(--cream, #f5f2ec);
   display: grid; gap: 16px; font-family: var(--sans, 'Inter', system-ui, sans-serif); color: var(--tw-ink); font-size: 14px; line-height: 1.45; text-align: left; }
 .tw h4 { font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: -.01em; margin: 0; }
 .tw small, .tw-dialog small { font-size: 12px; color: var(--tw-muted); }
@@ -20,9 +20,9 @@
 .tw-field textarea { resize: vertical; min-height: 84px; }
 .tw-field select:hover, .tw-field input:hover, .tw-field textarea:hover { border-color: rgba(11,19,64,.32); }
 .tw-field select:focus-visible, .tw-field input:focus-visible, .tw-field textarea:focus-visible, .tw-check input:focus-visible { outline: 2px solid var(--tw-accent); outline-offset: 1px; border-color: var(--tw-accent); }
-.tw-field [aria-invalid="true"] { border-color: #a23440; box-shadow: 0 0 0 1px #a23440; }
+.tw-field [aria-invalid="true"] { border-color: #ee364c; box-shadow: 0 0 0 1px #ee364c; }
 .tw-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.tw-ferr { display: block; font-style: normal; font-size: 12.5px; color: #a23440; }
+.tw-ferr { display: block; font-style: normal; font-size: 12.5px; color: #ee364c; }
 .tw-ferr::before { content: '! '; font-weight: 700; }
 .tw-hint { margin: 0; font-size: 12.5px; color: var(--tw-muted); }
 .tw-seats { margin: -6px 0 0; font-size: 12.5px; font-weight: 600; color: #a35a1f; }
@@ -118,7 +118,7 @@
 .tw-d-body { position: relative; display: grid; gap: 14px; padding: 28px 28px 26px; }
 .tw-d-title { margin: 0; padding-right: 44px; font-family: var(--display, inherit); font-size: 22px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; outline: none; }
 .tw-x { position: absolute; top: 18px; right: 18px; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--ink, #070c2b); font-size: 13px; cursor: pointer; }
-.tw-x:hover { border-color: var(--red, #c9606a); color: var(--red, #c9606a); }
+.tw-x:hover { border-color: var(--red, #ee364c); color: var(--red, #ee364c); }
 .tw-sum { display: grid; gap: 0; margin: 0; padding: 4px 16px; border-radius: 14px; background: var(--cream, #f5f2ec); }
 .tw-sum div { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; font-size: 13.5px; }
 .tw-sum div + div { border-top: 1px solid rgba(11,19,64,.08); }
@@ -129,7 +129,7 @@
 .tw-lines b { font-variant-numeric: tabular-nums; }
 .tw-d-body .tw-total { padding-top: 6px; border-top: 0; }
 .tw-check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
-.tw-check input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--red, #c9606a); flex: none; }
+.tw-check input { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--red, #ee364c); flex: none; }
 .tw-check a { text-decoration: underline; }
 .tw-done { text-align: center; justify-items: center; padding-top: 40px; }
 .tw-done .tw-d-title { padding-right: 0; }
@@ -156,7 +156,7 @@
 /* pop-up: photo banner and form fields */
 .tw-dialog { width: min(540px, calc(100vw - 24px)); overflow: hidden; }
 .tw-dialog[open] { display: block; overflow-y: auto; }
-.tw-hero { position: relative; display: grid; align-content: end; gap: 2px; min-height: 178px; padding: 24px 28px 22px; color: #fff; background: linear-gradient(135deg, #282c69, #c9606a) center / cover no-repeat; }
+.tw-hero { position: relative; display: grid; align-content: end; gap: 2px; min-height: 178px; padding: 24px 28px 22px; color: #fff; background: linear-gradient(135deg, #282c69, #ee364c) center / cover no-repeat; }
 .tw-hero small { font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.8); }
 .tw-hero .tw-d-title { font-size: 26px; line-height: 1.15; color: #fff; padding-right: 40px; }
 .tw-hero p { margin: 4px 0 0; font-size: 13.5px; color: rgba(255,255,255,.85); }
@@ -165,7 +165,7 @@
 .tw-lead { margin: 0; font-size: 14.5px; color: var(--muted, #5b6080); }
 .tw-sumchips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .tw-sumchips li { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 8px; border-radius: 99px; background: var(--cream, #f5f2ec); font-size: 12.5px; font-weight: 600; color: var(--ink, #070c2b); }
-.tw-sumchips li span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; color: var(--red, #c9606a); }
+.tw-sumchips li span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; color: var(--red, #ee364c); }
 .tw-sumchips svg { width: 13px; height: 13px; }
 .tw-f-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .tw-f { display: grid; gap: 6px; }
@@ -176,8 +176,8 @@
 .tw-f-i svg { width: 18px; height: 18px; }
 .tw-f-w input, .tw-f-w textarea { width: 100%; min-height: 50px; padding: 12px 14px 12px 44px; border: 1.5px solid var(--line, rgba(11,19,64,.12)); border-radius: 14px; background: #fbfaf7; color: var(--ink, #070c2b); font: inherit; font-size: 15px; transition: border-color .15s, background .15s, box-shadow .15s; }
 .tw-f-w input:hover, .tw-f-w textarea:hover { border-color: rgba(11,19,64,.3); }
-.tw-f-w input:focus-visible, .tw-f-w textarea:focus-visible { outline: none; border-color: var(--red, #c9606a); background: #fff; box-shadow: 0 0 0 4px rgba(201,96,106,.14); }
-.tw-f-w.is-bad input, .tw-f-w.is-bad textarea { border-color: #a23440; background: #fdf6f6; }
+.tw-f-w input:focus-visible, .tw-f-w textarea:focus-visible { outline: none; border-color: var(--red, #ee364c); background: #fff; box-shadow: 0 0 0 4px rgba(238,54,76,.14); }
+.tw-f-w.is-bad input, .tw-f-w.is-bad textarea { border-color: #ee364c; background: #fdf6f6; }
 .tw-f-area .tw-f-i { top: 18px; transform: none; }
 .tw-f-area textarea { resize: vertical; min-height: 110px; line-height: 1.5; }
 .tw-wide { width: 100%; gap: 10px; }
@@ -204,3 +204,21 @@
 .tw-tg-list li { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line, rgba(11,19,64,.12)); background: var(--cream, #f5f2ec); font-size: 12.5px; font-weight: 600; line-height: 1.3; color: var(--ink, #070c2b); }
 .tw-tg .tw-tick { flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #e6f1de; color: #4f7d3a; }
 .tw-tg .tw-tick svg { width: 10px; height: 10px; }
+/* Extra traveler forms in the Reserve pop-up */
+.tw-guests { display: grid; gap: 12px; }
+.tw-guest { display: grid; gap: 10px; margin: 0; padding: 12px 14px 14px; border: 1px solid var(--tw-line); border-radius: 14px; background: var(--tw-soft); }
+.tw-guest legend { padding: 0 6px; font-size: 12.5px; font-weight: 700; color: var(--tw-navy); }
+.tw-people li b { text-align: right; }
+
+/* The pop-up sits outside .tw, so it needs the colours too (fixes the white, invisible buttons) */
+.tw-dialog { --tw-line: var(--line, rgba(11,19,64,.12)); --tw-ink: var(--ink, #070c2b); --tw-muted: var(--muted, #5b6080); --tw-accent: var(--red, #ee364c); --tw-navy: var(--indigo, #282c69); --tw-soft: var(--cream, #f5f2ec); }
+.tw-dialog .tw-primary { background: #282c69; background: var(--tw-navy); color: #fff; }
+.tw-dialog .tw-ghost { background: #fff; color: #070c2b; color: var(--tw-ink); border-color: #070c2b; border-color: var(--tw-ink); }
+.tw-dialog .tw-actions { gap: 12px; margin-top: 6px; }
+.tw-dialog .tw-wide { margin-top: 6px; }
+.tw-dialog .tw-d-body { gap: 14px; }
+
+/* Space between Book now row, WhatsApp button and contact lines */
+.td-book-card [data-ita-booking] + .td-book-btn { margin-top: 14px; }
+.td-book-card .td-book-contact { margin-top: 18px; line-height: 1.7; }
+.tw .tw-actions { gap: 12px; }

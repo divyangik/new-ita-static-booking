@@ -104,12 +104,12 @@ if (cv && window.ITA_LAND) {
   const size = () => { W = cv.clientWidth; cv.width = cv.height = W * DPR; R = W * 0.4; };
   size(); addEventListener('resize', size);
   const col = (lon, lat) => {
-    if (lat > 58 && lon > -75 && lon < -10) return '#d9b75a';            // Greenland
-    if (lon < -30 && lat > 12) return '#c9606a';                         // North America
-    if (lon < -30 && lat <= 12) return lat > 7 ? '#c9606a' : '#8fb878';  // Central / South America
-    if (lon >= -30 && lon < 45 && lat > 36) return '#5f9fcf';            // Europe
-    if (lon >= -30 && lon < 52 && lat <= 36) return '#d98a5b';           // Africa / Middle East
-    if (lon > 110 && lat < -8) return '#7b6aa8';                         // Oceania
+    if (lat > 58 && lon > -75 && lon < -10) return '#ecdc25';            // Greenland
+    if (lon < -30 && lat > 12) return '#ee364c';                         // North America
+    if (lon < -30 && lat <= 12) return lat > 7 ? '#ee364c' : '#91ca64';  // Central / South America
+    if (lon >= -30 && lon < 45 && lat > 36) return '#01a1dd';            // Europe
+    if (lon >= -30 && lon < 52 && lat <= 36) return '#f07622';           // Africa / Middle East
+    if (lon > 110 && lat < -8) return '#732a82';                         // Oceania
     return '#7b83c9';                                                    // Asia
   };
   const P = ITA_LAND.map(([lon, lat]) => {
@@ -155,7 +155,7 @@ if (cv && window.ITA_LAND) {
       if (z < 0.05) return;
       const px = c + x * r, py = c + y * r, q = (ph + i * 0.25) % 1;
       ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, py, 3.2 * DPR, 0, 7); ctx.fill();
-      ctx.globalAlpha = (1 - q) * 0.8; ctx.strokeStyle = '#e3959b'; ctx.lineWidth = 1.5 * DPR;
+      ctx.globalAlpha = (1 - q) * 0.8; ctx.strokeStyle = '#ee364c'; ctx.lineWidth = 1.5 * DPR;
       ctx.beginPath(); ctx.arc(px, py, (4 + q * 18) * DPR, 0, 7); ctx.stroke();
     });
     ctx.globalAlpha = 1;
@@ -171,7 +171,7 @@ const mapc = $('#worldmap');
 if (mapc && window.ITA_LAND) {
   const ctx = mapc.getContext('2d'), DPR = Math.min(devicePixelRatio || 1, 2);
   const hubs = [['Southern California', -117.6, 34.1], ['Panama City', -79.5, 9], ['San Salvador', -89.2, 13.7], ['Managua', -86.3, 12.1]];
-  const reach = { LA: '#d6b477', EU: '#7696a9', AS: '#aabcb1', AF: '#c9aa70' };
+  const reach = { LA: '#d6b477', EU: '#7696a9', AS: '#aabcb1', AF: '#ecdc25' };
   const regionOf = (lon, lat) => lon < -30 ? 'LA' : (lon < 45 && lat > 36) ? 'EU' : (lon < 52) ? 'AF' : 'AS';
   let t0 = performance.now(), vis = false;
   const draw = t => {
