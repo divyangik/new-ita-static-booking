@@ -123,6 +123,7 @@ async function initializeEarth() {
     { name: 'Panama', region: 'Latin America', note: 'Our gateway to Latin America', latitude: 8.98, longitude: -79.52, label: 1 },
     { name: 'Los Angeles', region: 'North America', note: 'Southern California', latitude: 34.05, longitude: -118.24, label: 1, side: 'left' },
     { name: 'Mexico City', region: 'Latin America', note: 'Culture & cuisine', latitude: 19.43, longitude: -99.13, label: 2, side: 'left' },
+    { name: 'Belize', region: 'Latin America', note: 'Island life & adventure', latitude: 16.85, longitude: -88.28 },
     { name: 'Havana', region: 'Caribbean', note: 'Rhythm & heritage', latitude: 23.11, longitude: -82.37 },
     { name: 'San Salvador', region: 'Latin America', note: 'Real estate discovery', latitude: 13.69, longitude: -89.22 },
     { name: 'Cartagena', region: 'Latin America', note: 'Colonial Caribbean coast', latitude: 10.39, longitude: -75.51 },
@@ -130,6 +131,7 @@ async function initializeEarth() {
     { name: 'Lisbon', region: 'Europe', note: 'History & gastronomy', latitude: 38.72, longitude: -9.14, label: 1, side: 'left' },
     { name: 'Amalfi', region: 'Europe', note: 'The Italian coast', latitude: 40.63, longitude: 14.6, label: 2 },
     { name: 'Istanbul', region: 'Europe', note: 'Where continents meet', latitude: 41.01, longitude: 28.98 },
+    { name: 'Vienna', region: 'Europe', note: 'European Christmas', latitude: 48.21, longitude: 16.37 },
     { name: 'Cairo', region: 'Africa', note: 'The Nile & beyond', latitude: 30.04, longitude: 31.24, label: 1 },
     { name: 'Tanzania', region: 'Africa', note: 'The Great Migration', latitude: -3.39, longitude: 36.68, label: 2 },
     { name: 'Bangkok', region: 'Asia', note: 'Treasures of Thailand', latitude: 13.76, longitude: 100.5 },
@@ -138,9 +140,9 @@ async function initializeEarth() {
   ];
   const routePairs = [
     ['Los Angeles', 'Mexico City'], ['Mexico City', 'Panama'], ['Panama', 'Cusco'], ['Panama', 'Havana', 'secondary'],
-    ['Cartagena', 'Lisbon'], ['Lisbon', 'Amalfi'], ['Amalfi', 'Istanbul', 'secondary'], ['Istanbul', 'Cairo'],
+    ['Cartagena', 'Lisbon'], ['Lisbon', 'Amalfi'], ['Amalfi', 'Istanbul', 'secondary'], ['Amalfi', 'Vienna', 'secondary'], ['Istanbul', 'Cairo'],
     ['Cairo', 'Tanzania'], ['Istanbul', 'Bangkok'], ['Bangkok', 'Bali'], ['Bangkok', 'Kyoto', 'secondary'],
-    ['Kyoto', 'Los Angeles'], ['San Salvador', 'Panama', 'secondary'],
+    ['Kyoto', 'Los Angeles'], ['San Salvador', 'Panama', 'secondary'], ['Mexico City', 'Belize', 'secondary'],
   ];
   const compact = window.matchMedia('(max-width: 640px)');
   const markerGeometry = new THREE.SphereGeometry(.0125, 12, 8);

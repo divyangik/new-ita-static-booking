@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Run from the project root:  bash download-european-christmas-images.sh
+set -e
+OUT="public/img/trips/european-christmas"; mkdir -p "$OUT"
+B="https://cdn.shopify.com/s/files/1/0429/9751/4405/files"
+get(){
+  curl -fL --retry 2 -o "$OUT/$1.jpg" "$2" && echo "ok  $1.jpg"
+  curl -fL --retry 2 -o "$OUT/$1-800.jpg" "$2?width=800" && echo "ok  $1-800.jpg"
+  curl -fL --retry 2 -o "$OUT/$1-1600.jpg" "$2?width=1600" && echo "ok  $1-1600.jpg"
+}
+curl -fL -o "$OUT/cover.jpg" "https://itaglobal.com/cdn/shop/files/COVEREXPERIENCETHEMAGICOFAEUROPEANCHRISTMASAF.jpg" && echo "ok  cover.jpg"
+get budapest-night     "$B/leonhard-niederwimmer-pv-gC9-Ki7E-unsplash_1.jpg"
+curl -fL -o "$OUT/budapest-night-2400.jpg" "$B/leonhard-niederwimmer-pv-gC9-Ki7E-unsplash_1.jpg?width=2400" && echo "ok  budapest-night-2400.jpg"
+get danube-cruise      "$B/pexels-nicole-michalou-5768972.jpg"
+get budapest-baths     "$B/The_Common_Wanderer-185-3.jpg"
+get szentendre         "$B/192920.jpg"
+get christmas-market   "$B/naira-babayan-wz8TdZkp-5o-unsplash.jpg"
+get nutcracker         "$B/5-nutcracker-doll-leaping.original_9c763bc877987c02f78ae64259e693d3.jpg"
+get road-to-vienna     "$B/anton-F_WBo7keVqY-unsplash.jpg"
+get vienna-imperial    "$B/sandra-bittmann-WYMg2wNOVlI-unsplash.jpg"
+get schonbrunn         "$B/luca-n-GNX6twUsncU-unsplash.jpg"
+get schonbrunn-gallery "$B/csm_7_Grosse_Galerie__c__SKB__Foto_Agentur_Zolles_574291c4a3.jpg"
+get vienna-market      "$B/image.jpg"
+get vienna-opera       "$B/alexander-8j1ABxCEFNI-unsplash.jpg"
+get prague-arrival     "$B/methode_times_prod_web_bin_0f9568b0-6cbe-4f61-b8aa-c9c7709b8819.jpg"
+get prague-market      "$B/4d0bFZOE0Mq6swAs0SKku4C.jpg"
+get beer-spa           "$B/Czech-Republic-beer-spa-room.jpg"
+get christmas-dinner   "$B/PRGAZ-P0444-Christmas-Dinner.16x.jpg"
+get prague-clock       "$B/prague-orloj-01.jpg"
+get departure          "$B/1671462c4ab8ef00a9d1db2850703a53.jpg"

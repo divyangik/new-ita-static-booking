@@ -32,3 +32,23 @@
   from = "/products/treasures-of-thailand-an-exclusive-couples-journey"
   to = "/trips/treasures-of-thailand-an-exclusive-couples-journey"
   status = 301
+
+[[redirects]]
+  from = "/products/experience-the-magic-of-a-european-christmas-2025"
+  to = "/trips/experience-the-magic-of-a-european-christmas"
+  status = 301
+
+[[redirects]]
+  from = "/products/belize-family-friends-vacation"
+  to = "/trips/belize-family-friends-vacation"
+  status = 301
+
+[[redirects]]
+  from = "/products/afro-belize-garifuna-experience"
+  to = "/trips/afro-belize-garifuna-experience"
+  status = 301
+
+[[redirects]]
+  from = "/products/the-best-of-cartagena-colombia-vacation-tour-package"
+  to = "/trips/the-best-of-cartagena-colombia-vacation-tour-package"
+  status = 301

@@ -211,7 +211,11 @@ if (mapc && window.ITA_LAND) {
 const tripPages = {
   'boquete-panama-real-estate-lifestyle-discovery-1': '/trips/boquete-panama-real-estate-lifestyle-discovery',
   'japan-a-journey-through-cultural-depth-timeless-elegance-1': '/trips/japan-a-journey-through-cultural-depth-timeless-elegance',
-  'treasures-of-thailand-an-exclusive-couples-journey': '/trips/treasures-of-thailand-an-exclusive-couples-journey'
+  'treasures-of-thailand-an-exclusive-couples-journey': '/trips/treasures-of-thailand-an-exclusive-couples-journey',
+  'experience-the-magic-of-a-european-christmas-2025': '/trips/experience-the-magic-of-a-european-christmas',
+  'belize-family-friends-vacation': '/trips/belize-family-friends-vacation',
+  'afro-belize-garifuna-experience': '/trips/afro-belize-garifuna-experience',
+  'the-best-of-cartagena-colombia-vacation-tour-package': '/trips/the-best-of-cartagena-colombia-vacation-tour-package'
 };
 const tripLink = t => tripPages[t.id] ? `href="${tripPages[t.id]}"` : `href="${t.url}" target="_blank" rel="noopener"`;
 const tripCard = t => `
@@ -219,7 +223,7 @@ const tripCard = t => `
     <div class="ph"><img src="/${t.img}" alt="${t.title.replace(/"/g, '')}" loading="lazy" width="800" height="1000"><span class="badge">${t.region}</span></div>
     <div class="body"><small class="trip-category">${t.cat}</small>
       <h4>${t.title}</h4>
-      <div class="meta"><span class="price">${t.cat === 'Day Experience' ? '' : 'from '}<b>${fmt(t.price)}</b>${t.price > 400 ? ' pp' : ''}</span><span class="ar" aria-hidden="true">↗</span></div>
+      <div class="meta"><span class="price">${t.price > 0 ? `${t.cat === 'Day Experience' ? '' : 'from '}<b>${fmt(t.price)}</b>${t.price > 400 ? ' pp' : ''}` : '<b>$X,XXX</b> pp'}</span><span class="ar" aria-hidden="true">↗</span></div>
     </div></a>`;
 $$('[data-rail]').forEach(el => {
   const f = el.dataset.rail, ids = (el.dataset.ids || '').split(',').filter(Boolean);
