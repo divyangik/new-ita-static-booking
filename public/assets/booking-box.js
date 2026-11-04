@@ -1,4 +1,4 @@
-// ITA trip booking widget. Book now opens a Shopify checkout; enquiries go to Netlify Forms.
+// ITA trip booking widget. Book now opens a Shopify checkout; enquiries are emailed (see ita-services.js).
 (() => {
   const mounts = [...document.querySelectorAll('[data-ita-booking]')];
   const api = window.ITAServices && window.ITAServices.api;
@@ -87,18 +87,24 @@
 
   let dialogCount = 0;
 
-  // One place that writes the live price (from the admin app) into every spot on the page that shows "From $X"
-  const setPagePrice = (price, currency) => {
+  // One place that writes the live price into every spot on the page that shows "From $X"
+  const setPagePrice = (price, currency, unit = 'person') => {
     if (!(Number(price) > 0)) return;
     const text = money(Number(price), currency || 'USD');
     const card = document.querySelector('.td-book-card');
     const top = card && card.querySelector('.td-book-top');
-    if (top) top.innerHTML = `<small>From</small><b>${text}</b><span>per person</span>`;
-    document.querySelectorAll('.td-subnav-cta b, .td-mobar b').forEach(el => { el.textContent = text; });
-    // Hero price: change only the amount and keep the "per person*" label next to it
+    if (top) top.innerHTML = `<small>From</small><b>${text}</b><span>per ${esc(unit)}</span>`;
+    document.querySelectorAll('.td-subnav-cta b, .td-mobar b').forEach(el => {
+      el.textContent = text;
+      const after = el.nextSibling;
+      if (unit !== 'person' && after && after.nodeType === 3) after.nodeValue = ` per ${unit}`;
+    });
+    // Hero price: change the amount, and the "per person*" label when priced per couple
     document.querySelectorAll('.price dd').forEach(dd => {
       const first = dd.firstChild;
       if (first && first.nodeType === 3) first.nodeValue = `${text} `; else dd.prepend(document.createTextNode(`${text} `));
+      const small = dd.querySelector('small');
+      if (small && unit !== 'person') small.textContent = `per ${unit}*`;
     });
   };
   const cleanLabelEarly = text => (text && !/^(n\/?a|none|null|-+|—)$/i.test(String(text).trim()) ? String(text).trim() : '');
@@ -154,7 +160,7 @@
     if (!trip || !trip.view || !trip.trip) return;
     renderTripCard(mount, trip);
 
-    // ---------- data from the admin app ----------
+    // ---------- trip data ----------
     const T = trip.trip;
     const currency = trip.currency || T.pricing.currency || 'USD';
     const title = trip.title || mount.dataset.title || 'this journey';
@@ -162,6 +168,9 @@
     const openDates = (trip.dates || []).filter(d =>
       ['Available', 'Guaranteed'].includes(d.status) && String(d.departure_date) > today && !(d.seats_total > 0 && d.seats_available <= 0));
     const fixedMode = openDates.length > 0;
+    // A fixed tour month (e.g. "December 2026"): shown as the tour date, with no date picker
+    const dateLabel = cleanLabelEarly(T.info.date_label);
+    const labelMode = !fixedMode && !!dateLabel;
     const shopifyMode = !!trip.shopify;
     const bookable = fixedMode || shopifyMode;
     const minGuests = Math.max(1, num(T.capacity.min_group_size));
@@ -173,22 +182,19 @@
     const endCity = T.info.end_city || startCity;
     const defaultDate = openDates.find(d => d.is_default) || openDates[0] || null;
 
-    // Rows of Guests & Rooms: one per package type selected in the admin (or a plain Traveler row)
+    // Rows of Guests & Rooms: one per package type (or a plain Traveler row)
     const isChildType = t => /^child/i.test(t.value || t.name);
     const childType = (T.traveller_types || []).find(isChildType) || null;
     const isCouple = t => /^couple/i.test(t.value || t.name);
     const packageKinds = (T.package_types || []).length
       ? T.package_types.map(t => ({ key: `pkg:${t.value || t.name}`, type: isCouple(t) ? 'couple' : 'adult', label: t.name, name: t.name, sub: t.message || (isCouple(t) ? 'Couple room' : 'Double Occupancy'), mult: isCouple(t) ? 2 : 1, icon: icons.user }))
       : [{ key: 'adult', type: 'adult', label: '', name: 'Traveler', sub: 'Double Occupancy', mult: 1, icon: icons.user }];
-    // Every other traveller type picked in the admin (Senior, Student...) becomes its own row, priced like an adult
     const usedNames = new Set(packageKinds.map(k => String(k.name).toLowerCase()));
     const travellerKinds = (T.traveller_types || [])
       .filter(t => !isChildType(t) && !usedNames.has(String(t.name).toLowerCase()))
       .map(t => ({ key: `trv:${t.value || t.name}`, type: 'adult', label: t.name, name: t.name, sub: t.message || 'Per traveler', mult: 1, icon: icons.user }));
     const childKind = childType && T.capacity.child_allowed ? { key: 'child', type: 'child', label: '', name: childType.name || 'Child', sub: childType.message || 'Child under 18', mult: 1, icon: icons.child } : null;
 
-    // Rooms from the Capacity tab (Private rooms, Couple room, Child room). A row shows once its Type is filled in.
-    // "Count" is the most rooms a customer can book (0 = no limit).
     const roomMax = count => (num(count) > 0 ? num(count) : 0);
     const singleKind = { key: 'single', type: 'single', room: true, label: '', name: cleanLabelEarly(T.capacity.private_rooms_type) || 'Private room', sub: 'Single occupancy', mult: 1, max: roomMax(T.capacity.private_rooms_count), icon: icons.room };
     const coupleRoomKind = cleanLabelEarly(T.capacity.couple_room_type)
@@ -207,8 +213,7 @@
     state.counts[packageKinds[0].key] = Math.max(1, Math.ceil(minGuests / packageKinds[0].mult));
 
     const date = () => openDates.find(d => String(d.id) === state.dateId) || null;
-    const cleanLabel = text => (text && !/^(n\/?a|none|null|-+|—)$/i.test(String(text).trim()) ? String(text).trim() : '');
-    // "44 Days, 43 Nights", worked out from the chosen tour date. Without a date, the admin's duration is used.
+    const cleanLabel = cleanLabelEarly;
     const durationText = () => {
       const d = date();
       if (d) { const nights = dayDiff(d.departure_date, d.return_date); return `${plural(nights + 1, 'Day')}, ${plural(nights, 'Night')}`; }
@@ -225,7 +230,6 @@
     };
     const allKinds = () => [...packageKinds, ...travellerKinds, childKind, singleKind, coupleRoomKind, childRoomKind].filter(Boolean);
     const kindMax = kind => kind.max > 0 ? Math.min(kind.max, ROW_MAX) : ROW_MAX;
-    // Private room shows when the admin named it, gave it a price, or the date has a single supplement
     const singleVisible = () => !!cleanLabelEarly(T.capacity.private_rooms_type) || num(T.capacity.private_rooms_price) > 0 || unitPrices().single > 0;
     const qtyOf = kind => state.counts[kind.key] || 0;
     const travelers = () => allKinds().reduce((n, kind) => n + qtyOf(kind) * kind.mult, 0);
@@ -238,13 +242,11 @@
     };
     const seatLimit = () => { const d = date(); return d && d.seats_total > 0 ? d.seats_available : Infinity; };
     const guestCap = () => seatLimit();
-    // The admin sets the maximum in the dashboard (Max quantity). 0 means no limit, up to a safety cap.
     const addonMax = addon => (num(addon.max_qty) > 0 ? num(addon.max_qty) : 20);
     const unitPrices = () => {
       const d = date();
       const p = num(T.pricing.price_per_person);
       const single = num(T.capacity.private_rooms_price) || (d ? num(d.single_supplement) : 0);
-      // Pricing tab price first; the date's own price is only a fallback
       if (d) { const adult = p || num(d.adult_price); return { adult, child: num(d.child_price) || adult, single }; }
       return { adult: p, child: p, single };
     };
@@ -262,7 +264,6 @@
     const travelerSummary = () => allKinds().filter(kind => qtyOf(kind) > 0)
       .map(kind => `${qtyOf(kind)} ${kind.name}${kind.type === 'couple' ? ' (2 travelers)' : ''}`).join(', ');
     const extrasSummary = () => addons.filter(a => state.addons[a.id] > 0).map(a => `${state.addons[a.id]} × ${a.addon_name}`).join(', ');
-    // One slot per person on the trip, in order (a couple room = 2 people). Used for the traveler forms.
     const travelerSlots = () => {
       const slots = [];
       allKinds().forEach(kind => {
@@ -281,9 +282,8 @@
       rows: allKinds().filter(kind => qtyOf(kind) > 0).map(kind => ({ type: kind.type, qty: qtyOf(kind), ...(kind.label ? { label: kind.label } : {}), ...(kind.room ? { room: true } : {}) })),
       addons: addons.filter(a => state.addons[a.id] > 0).map(a => ({ id: a.id, qty: state.addons[a.id] })),
       payment_type: state.pay === 'full' ? 'full' : 'deposit',
-      dates: date() ? null : { from: state.from, to: state.to },
+      dates: date() || labelMode ? null : { from: state.from, to: state.to },
       contact,
-      // Traveler 1 = the person booking, then one entry for every other traveler
       travelers: [{ ...contact, type: (travelerSlots()[0] || {}).label || '' }, ...dlg.guests.map((g, i) => ({ name: g.name.trim(), email: g.email.trim(), phone: g.phone.trim(), type: (travelerSlots()[i + 1] || {}).label || '' }))]
     });
 
@@ -305,7 +305,6 @@
 
     const widgetView = () => {
       const d = date();
-      const u = unitPrices();
       const n = travelers();
       const cap = guestCap();
       const est = estimate();
@@ -316,6 +315,10 @@
           <select name="dateId" data-fk="date">${openDates.map(x => `<option value="${x.id}" ${String(x.id) === state.dateId ? 'selected' : ''}>${dmy(x.departure_date)}${x.status === 'Guaranteed' ? ' · Guaranteed departure' : ''}</option>`).join('')}</select>
         </label>
         ${d && d.seats_total > 0 && d.seats_available <= 10 ? `<p class="tw-seats">Only ${plural(d.seats_available, 'seat')} left on this date</p>` : ''}`
+        : labelMode ? `
+        <div class="tw-field"><span>Tour date</span>
+          <b style="display:block;padding:12px 14px;border:1px solid rgba(7,12,43,.15);border-radius:10px;font-weight:600">${esc(dateLabel)}</b>
+        </div>`
         : `<div class="tw-dates">
             <label class="tw-field"><span>From</span><input type="date" name="from" data-fk="from" min="${isoTomorrow()}" value="${esc(state.from)}"></label>
             <label class="tw-field"><span>To</span><input type="date" name="to" data-fk="to" min="${esc(state.from || isoTomorrow())}" value="${esc(state.to)}"></label>
@@ -330,9 +333,8 @@
         </div>`;
 
       const visibleKinds = allKinds().filter(kind => kind !== singleKind || singleVisible());
-      // Prices are not shown per row. The customer sees the total below.
       const guestRows = visibleKinds.map(kind => row({ icon: kind.icon, name: kind.name, sub: kind.sub, price: '',
-        step: stepper(kind.name, `data-guest="${esc(kind.key)}"`, qtyOf(kind), qtyOf(kind) > 0 && n - kind.mult >= minGuests, qtyOf(kind) < kindMax(kind) && n + kind.mult <= cap) }));
+        step: stepper(kind.name, `data-guest="${esc(kind.key)}"`, kind.type === 'couple' ? qtyOf(kind) * kind.mult : qtyOf(kind), qtyOf(kind) > 0 && n - kind.mult >= minGuests, qtyOf(kind) < kindMax(kind) && n + kind.mult <= cap) }));
 
       const extras = addons.length ? `
         <section class="tw-sec">
@@ -374,7 +376,6 @@
       const secondaryLabel = T.cta.secondary_label || 'Enquiry Now';
       return `
         <div class="tw">
-          ${T.info.departure_city ? `<p class="tw-dep">Departure city <b>${esc(T.info.departure_city)}</b></p>` : ''}
           ${dateBlock}
           ${route}
           <section class="tw-sec">
@@ -394,12 +395,12 @@
         </div>`;
     };
 
-    // The big price at the top follows the chosen tour date (adult price of that date)
     const updateTopPrice = () => {
       const d = date();
       const price = num(T.pricing.price_per_person) || (d ? num(d.adult_price) : 0);
       if (!(price > 0)) return;
-      setPagePrice(price, currency);
+      const mult = Math.max(1, num(T.pricing.display_mult) || 1);
+      setPagePrice(price * mult, currency, T.pricing.display_label || 'person');
     };
 
     const renderWidget = () => {
@@ -442,14 +443,16 @@
     const selectionRows = () => {
       const d = date();
       return [
-        fixedMode && d ? ['calendar', `${dmy(d.departure_date)} → ${dmy(d.return_date)}`] : (state.from && state.to ? ['calendar', `${dmy(state.from)} → ${dmy(state.to)}`] : null),
+        fixedMode && d ? ['calendar', `${dmy(d.departure_date)} → ${dmy(d.return_date)}`]
+          : labelMode ? ['calendar', dateLabel]
+          : (state.from && state.to ? ['calendar', `${dmy(state.from)} → ${dmy(state.to)}`] : null),
         ['people', travelerSummary()],
         extrasSummary() ? ['sparkle', extrasSummary()] : null
       ].filter(Boolean);
     };
     const selectionSummary = () => {
       const d = date();
-      const parts = [['Trip', title], ...selectionRows().map(([kind, text]) => [kind === 'calendar' ? (fixedMode && d ? 'Tour date' : 'Preferred dates') : kind === 'people' ? 'Travelers' : 'Extras', text])];
+      const parts = [['Trip', title], ...selectionRows().map(([kind, text]) => [kind === 'calendar' ? ((fixedMode && d) || labelMode ? 'Tour date' : 'Preferred dates') : kind === 'people' ? 'Travelers' : 'Extras', text])];
       return `<dl class="tw-sum">${parts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
     };
     const selectionChips = () => `<ul class="tw-sumchips" aria-label="Your selection">${selectionRows().map(([kind, text]) => `<li><span>${iconLibrary[kind] || fieldIcons[kind]}</span>${esc(text)}</li>`).join('')}</ul>`;
@@ -563,6 +566,7 @@
       const d = date();
       const lines = [`Trip: ${title}`];
       if (fixedMode && d) lines.push(`Tour date: ${dmy(d.departure_date)} to ${dmy(d.return_date)}`);
+      else if (labelMode) lines.push(`Tour date: ${dateLabel}`);
       else lines.push(state.from && state.to ? `Preferred dates: ${dmy(state.from)} to ${dmy(state.to)}` : 'Preferred dates: not chosen yet');
       lines.push(`Travelers: ${travelerSummary()}`);
       if (extrasSummary()) lines.push(`Extras: ${extrasSummary()}`);
@@ -650,7 +654,7 @@
     const checkReady = () => {
       if (fixedMode) {
         if (!date()) return 'Please choose a tour date.';
-      } else {
+      } else if (!labelMode) {
         if (!state.from || !state.to) return 'Please choose your From and To dates.';
         if (state.to < state.from) return 'The end date must be after the start date.';
       }
@@ -696,7 +700,6 @@
       const field = event.target;
       if (field.name === 'dateId') {
         state.dateId = field.value;
-        const d = date();
         if (!singleVisible()) state.counts.single = 0;
         const first = packageKinds[0];
         while (travelers() > guestCap() && qtyOf(first) > 1) state.counts[first.key] -= 1;

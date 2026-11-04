@@ -4,31 +4,46 @@
 (() => {
   const mountFor = productId => document.querySelector(`[data-ita-booking][data-product-id="${productId}"]`);
 
-  // Per-trip details, keyed by Shopify product ID. A trip with no entry here uses the preferred From/To dates.
+  // Per-trip details, keyed by Shopify product ID. A trip with no dates here uses the preferred From/To dates.
   // Extras are calculated in the widget. An extra with a Shopify variant ID is also charged at checkout;
   // one without is written on the order and confirmed by the ITA team.
   const tripConfigs = {
+    // Japan
     '15449689129256': {
       departureCity: 'Tokyo', startCity: 'Tokyo', endCity: 'Kyoto',
       dates: [{ from: '2027-03-24', to: '2027-04-02' }, { from: '2027-04-02', to: '2027-04-11' }],
       addons: [{ id: 'extra-night', name: 'Extra Night', price: 500, maxQty: 0, description: '', variant: '' }]
+    },
+    // Thailand
+    '15462490374440': {
+      departureCity: 'Bangkok', startCity: 'Bangkok', endCity: 'Phuket',
+      dates: [{ from: '2027-11-02', to: '2027-11-11' }],
+      packageTypes: [{ name: 'Couple', message: 'Double Occupancy' }],
+      minGroup: 2,
+      // Priced per couple: 1 couple = 2 travelers = Shopify price x 2
+      priceUnit: { label: 'couple', mult: 2 },
+      addons: []
+    },
+    // European Christmas (Budapest -> Prague): per person, customer picks From/To dates (same as the old site)
+    '15465231253800': {
+      // No route box; the card shows a Departure row instead (like Boquete)
+      dates: [],
+      addons: []
     }
-  };
-  tripConfigs['15462490374440'] = {
-    departureCity: 'Bangkok', startCity: 'Bangkok', endCity: 'Phuket',
-    dates: [{ from: '2027-11-02', to: '2027-11-11' }],
-    packageTypes: [{ name: 'Couple', message: 'Double Occupancy' }],
-    minGroup: 2,
-    addons: []
   };
   const configFor = productId => tripConfigs[productId] || { dates: [], addons: [] };
   const activeAddons = config => config.addons || [];
 
-  const priceFromPage = () => {
+  // Per-person price, read once from the page and kept on the mount
+  // (the widget may later show a per-couple price in the same spot).
+  const priceFromPage = mount => {
+    if (mount && Number(mount.dataset.unitPrice) > 0) return Number(mount.dataset.unitPrice);
     const el = document.querySelector('.td-book-top b');
     const value = el ? Number(String(el.textContent).replace(/[^0-9.]/g, '')) : 0;
+    if (mount && value > 0) mount.dataset.unitPrice = String(value);
     return value > 0 ? value : 0;
   };
+  const unitOf = productId => configFor(productId).priceUnit || null;
 
   const emptyTrip = (mount, price) => {
     const currency = mount.dataset.currency || 'USD';
@@ -47,7 +62,7 @@
         id: addon.id, addon_name: addon.name, description: addon.description || '', price: addon.price, max_qty: addon.maxQty || 0, visible: true, display_order: index
       })),
       trip: {
-        pricing: { price_per_person: price, currency },
+        pricing: { price_per_person: price, currency, display_label: (config.priceUnit || {}).label || 'person', display_mult: (config.priceUnit || {}).mult || 1 },
         capacity: {
           min_group_size: config.minGroup || 1, child_allowed: false,
           private_rooms_type: '', private_rooms_count: 0, private_rooms_price: 0,
@@ -55,7 +70,7 @@
           child_room_type: '', child_room_count: 0, child_room_price: 0
         },
         payment: { deposit_amount: 0, installments: 1, preselect_full_payment: false, option_label: 'I want to Deposit', show_deal_price_badge: false },
-        info: { start_city: config.startCity || '', end_city: config.endCity || '', departure_city: config.departureCity || '', duration_label: '', days: 0, nights: 0 },
+        info: { start_city: config.startCity || '', end_city: config.endCity || '', departure_city: config.departureCity || '', duration_label: config.durationLabel || '', date_label: config.dateLabel || '', days: 0, nights: 0 },
         traveller_types: [], package_types: (config.packageTypes || []).map(type => ({ name: type.name, value: type.name.toLowerCase(), message: type.message || '' })), tour_types: [], included: [],
         cta: { primary_label: 'Book now', secondary_label: 'Enquiry Now' },
         has_itinerary_pdf: false
@@ -65,7 +80,7 @@
 
   const getTrip = async productId => {
     const mount = mountFor(productId);
-    const price = priceFromPage();
+    const price = priceFromPage(mount);
     if (!mount || !mount.dataset.store || !/^\d{6,}$/.test(mount.dataset.variant || '') || !price) {
       const error = new Error('Booking is not set up for this trip yet.');
       error.code = 'not_configured';
@@ -85,9 +100,12 @@
   };
 
   const quote = async body => {
-    const price = priceFromPage();
+    const price = priceFromPage(mountFor(body.shopify_product_id));
     const count = travelerCount(body);
-    const lines = [{ label: 'Traveler', qty: count, amount: price * count }];
+    const unit = unitOf(body.shopify_product_id);
+    const lines = unit
+      ? [{ label: `${unit.label[0].toUpperCase()}${unit.label.slice(1)} (${unit.mult} travelers)`, qty: Math.ceil(count / unit.mult), amount: price * count }]
+      : [{ label: 'Traveler', qty: count, amount: price * count }];
     addonsOf(body).forEach(addon => lines.push({ label: addon.name, qty: addon.qty, amount: addon.price * addon.qty }));
     const total = lines.reduce((sum, line) => sum + line.amount, 0);
     const later = addonsOf(body).filter(addon => !addon.variant).reduce((sum, addon) => sum + addon.price * addon.qty, 0);
@@ -99,7 +117,8 @@
       const date = (configFor(body.shopify_product_id).dates || []).find(item => item.from === String(body.date_id));
       if (date) return `${date.from} to ${date.to}`;
     }
-    return body.dates && body.dates.from && body.dates.to ? `${body.dates.from} to ${body.dates.to}` : 'Not chosen';
+    if (body.dates && body.dates.from && body.dates.to) return `${body.dates.from} to ${body.dates.to}`;
+    return configFor(body.shopify_product_id).dateLabel || 'Not chosen';
   };
 
   // Shopify cart link: variant x travelers. Everything else goes on the order as "Additional details".
@@ -112,8 +131,9 @@
 
     const attributes = {
       'Trip': mount.dataset.title || '',
-      [body.date_id ? 'Tour date' : 'Preferred dates']: dateText(body),
+      [body.date_id || configFor(body.shopify_product_id).dateLabel ? 'Tour date' : 'Preferred dates']: dateText(body),
       'Travelers': String(count),
+      ...(unitOf(body.shopify_product_id) ? { 'Couples': String(Math.ceil(count / unitOf(body.shopify_product_id).mult)) } : {}),
       'Trip total': `${q.total} ${mount.dataset.currency || 'USD'}`,
       'Paid at checkout': `${q.due_now} ${mount.dataset.currency || 'USD'}`
     };
@@ -133,7 +153,7 @@
     return { checkout_url: `https://${store}/cart/${items}?${params.join('&')}` };
   };
 
-  // Enquiries are emailed through Web3Forms (no backend). Paste the Access Key you get by email from https://web3forms.com
+  // Enquiries are emailed through Web3Forms (no backend). Access Key from https://web3forms.com
   const accessKey = '58439164-9998-4dda-8841-e734239117e6';
 
   const postForm = async fields => {
