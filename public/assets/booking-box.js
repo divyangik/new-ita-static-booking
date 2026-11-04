@@ -1,4 +1,4 @@
-// ITA trip booking widget. Everything shown here comes from the ITA admin app.
+// ITA trip booking widget. Book now opens a Shopify checkout; enquiries go to Netlify Forms.
 (() => {
   const mounts = [...document.querySelectorAll('[data-ita-booking]')];
   const api = window.ITAServices && window.ITAServices.api;
@@ -162,6 +162,8 @@
     const openDates = (trip.dates || []).filter(d =>
       ['Available', 'Guaranteed'].includes(d.status) && String(d.departure_date) > today && !(d.seats_total > 0 && d.seats_available <= 0));
     const fixedMode = openDates.length > 0;
+    const shopifyMode = !!trip.shopify;
+    const bookable = fixedMode || shopifyMode;
     const minGuests = Math.max(1, num(T.capacity.min_group_size));
     const ROW_MAX = 20;
     const addons = (trip.addons || []).filter(a => a.visible !== false);
@@ -248,7 +250,7 @@
     };
     const estimate = () => {
       const d = date();
-      if (!d) return null;
+      if (!d && !bookable) return null;
       const u = unitPrices();
       let total = allKinds().reduce((sum, kind) => sum + qtyOf(kind) * pricePer(kind, u), 0);
       addons.forEach(a => { total += (state.addons[a.id] || 0) * num(a.price); });
@@ -279,6 +281,7 @@
       rows: allKinds().filter(kind => qtyOf(kind) > 0).map(kind => ({ type: kind.type, qty: qtyOf(kind), ...(kind.label ? { label: kind.label } : {}), ...(kind.room ? { room: true } : {}) })),
       addons: addons.filter(a => state.addons[a.id] > 0).map(a => ({ id: a.id, qty: state.addons[a.id] })),
       payment_type: state.pay === 'full' ? 'full' : 'deposit',
+      dates: date() ? null : { from: state.from, to: state.to },
       contact,
       // Traveler 1 = the person booking, then one entry for every other traveler
       travelers: [{ ...contact, type: (travelerSlots()[0] || {}).label || '' }, ...dlg.guests.map((g, i) => ({ name: g.name.trim(), email: g.email.trim(), phone: g.phone.trim(), type: (travelerSlots()[i + 1] || {}).label || '' }))]
@@ -317,7 +320,7 @@
             <label class="tw-field"><span>From</span><input type="date" name="from" data-fk="from" min="${isoTomorrow()}" value="${esc(state.from)}"></label>
             <label class="tw-field"><span>To</span><input type="date" name="to" data-fk="to" min="${esc(state.from || isoTomorrow())}" value="${esc(state.to)}"></label>
           </div>
-          <p class="tw-hint">No fixed departures yet. Choose the dates you prefer and we will confirm availability and price.</p>`;
+          <p class="tw-hint">Choose the dates you prefer. We will confirm them with you after booking.</p>`;
 
       const route = !(startCity || endCity) ? '' : `
         <div class="tw-route" aria-label="Tour route">
@@ -344,7 +347,7 @@
           }).join('')}
         </section>` : '';
 
-      const payment = !fixedMode ? '' : `
+      const payment = !fixedMode || shopifyMode ? '' : `
         <section class="tw-sec">
           <div class="tw-sec-head"><h4>Payment</h4></div>
           <div class="tw-pay">
@@ -363,11 +366,11 @@
           </div>
         </section>`;
 
-      const totalBar = fixedMode && est ? `
+      const totalBar = bookable && est ? `
         <div class="tw-total"><span>Trip total</span><b>${money(est.total, currency)}</b></div>
-        <p class="tw-due">Due now: <b>${money(est.due, currency)}</b>${est.balance > 0 ? ` · Balance ${money(est.balance, currency)}` : ''}</p>` : '';
+        ${shopifyMode ? '' : `<p class="tw-due">Due now: <b>${money(est.due, currency)}</b>${est.balance > 0 ? ` · Balance ${money(est.balance, currency)}` : ''}</p>`}` : '';
 
-      const primaryLabel = fixedMode ? (T.cta.primary_label || 'Book now') : 'Send enquiry';
+      const primaryLabel = bookable ? (T.cta.primary_label || 'Book now') : 'Send enquiry';
       const secondaryLabel = T.cta.secondary_label || 'Enquiry Now';
       return `
         <div class="tw">
@@ -384,8 +387,8 @@
           ${totalBar}
           ${state.error ? `<p class="tw-err" role="alert">${esc(state.error)}</p>` : ''}
           <div class="tw-actions">
-            ${fixedMode ? `<button type="button" class="tw-btn tw-ghost" data-act="enquiry">${esc(secondaryLabel)}</button>` : ''}
-            <button type="button" class="tw-btn tw-primary" data-act="${fixedMode ? 'reserve' : 'enquiry'}">${esc(primaryLabel)}</button>
+            ${bookable ? `<button type="button" class="tw-btn tw-ghost" data-act="enquiry">${esc(secondaryLabel)}</button>` : ''}
+            <button type="button" class="tw-btn tw-primary" data-act="${bookable ? 'reserve' : 'enquiry'}">${esc(primaryLabel)}</button>
           </div>
           ${T.has_itinerary_pdf ? `<button type="button" class="tw-link" data-act="itinerary">${icons.mail}<span>Email itinerary</span></button>` : ''}
         </div>`;
@@ -402,8 +405,20 @@
     const renderWidget = () => {
       const focusKey = document.activeElement && mount.contains(document.activeElement) ? document.activeElement.dataset.fk : null;
       mount.innerHTML = widgetView();
+      if (shopifyMode) {
+        const card = mount.closest('.td-book-card');
+        const hide = /^(hotel|tour date)$/i;
+        if (card) {
+          card.querySelectorAll('.td-book-list li').forEach(li => {
+            const label = li.querySelector('span');
+            const name = label ? label.textContent.trim() : '';
+            if (hide.test(name) || (startCity && /^departure$/i.test(name))) li.remove();
+          });
+          if (startCity || endCity) card.querySelectorAll('.td-route').forEach(el => el.remove());
+        }
+      }
       if (focusKey) { const el = mount.querySelector(`[data-fk="${focusKey}"]`); if (el) el.focus(); }
-      setDurationFact(durationText());
+      setDurationFact(shopifyMode && (startCity || endCity) ? '' : durationText());
       updateTopPrice();
     };
 
@@ -472,7 +487,7 @@
         <ul class="tw-lines tw-people">${[{ name: dlg.name.trim() }, ...dlg.guests].map((g, i) => `<li><span>Traveler ${i + 1}</span><b>${esc(g.name.trim())}</b></li>`).join('')}</ul>
         <ul class="tw-lines">${q.lines.map(l => `<li><span>${esc(l.label)} × ${l.qty}</span><b>${money(num(l.amount), currency)}</b></li>`).join('')}</ul>
         <div class="tw-total"><span>Trip total</span><b>${money(num(q.total), currency)}</b></div>
-        <div class="tw-total due"><span>${q.payment_type === 'deposit' ? 'Deposit due now' : 'Due now'}</span><b>${money(num(q.due_now), currency)}</b></div>
+        ${shopifyMode ? '' : `<div class="tw-total due"><span>${q.payment_type === 'deposit' ? 'Deposit due now' : 'Due now'}</span><b>${money(num(q.due_now), currency)}</b></div>`}
         ${num(q.balance) > 0 ? `<p class="tw-hint">The remaining ${money(num(q.balance), currency)} is arranged with your ITA Global specialist.</p>` : ''}
         ${dlg.error ? `<p class="tw-err" role="alert">${esc(dlg.error)}</p>` : ''}
         <div class="tw-actions">
@@ -552,7 +567,7 @@
       lines.push(`Travelers: ${travelerSummary()}`);
       if (extrasSummary()) lines.push(`Extras: ${extrasSummary()}`);
       const est = estimate();
-      if (fixedMode && est) lines.push(`Estimated total: ${money(est.total, currency)} (${state.pay === 'deposit' ? 'deposit' : 'full payment'} preferred)`);
+      if (bookable && est) lines.push(`Estimated total: ${money(est.total, currency)} (${state.pay === 'deposit' ? 'deposit' : 'full payment'} preferred)`);
       if (dlg.message.trim()) lines.push('', `Message: ${dlg.message.trim()}`);
       return lines.join('\n');
     };
