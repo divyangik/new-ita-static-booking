@@ -8,11 +8,18 @@
   // Extras are calculated in the widget. An extra with a Shopify variant ID is also charged at checkout;
   // one without is written on the order and confirmed by the ITA team.
   const tripConfigs = {
-    // Japan
+    // Boquete, Panama: deposit per traveler, paid through the product's "Deposit" variant
+    '15446849978664': {
+      dates: [],
+      addons: [],
+      deposit: { amount: 500, installments: 2, variant: '68099276013864', preselectFull: true }
+    },
+    // Japan: deposit per traveler, paid through the product's "Deposit" variant
     '15449689129256': {
       departureCity: 'Tokyo', startCity: 'Tokyo', endCity: 'Kyoto',
       dates: [{ from: '2027-03-24', to: '2027-04-02' }, { from: '2027-04-02', to: '2027-04-11' }],
-      addons: [{ id: 'extra-night', name: 'Extra Night', price: 500, maxQty: 0, description: '', variant: '' }]
+      addons: [{ id: 'extra-night', name: 'Extra Night', price: 500, maxQty: 0, description: '', variant: '' }],
+      deposit: { amount: 1000, installments: 2, variant: '68099294134568', preselectFull: true }
     },
     // Thailand
     '15462490374440': {
@@ -44,6 +51,10 @@
     return value > 0 ? value : 0;
   };
   const unitOf = productId => configFor(productId).priceUnit || null;
+  const depositOf = productId => {
+    const deposit = configFor(productId).deposit;
+    return deposit && Number(deposit.amount) > 0 ? deposit : null;
+  };
 
   const emptyTrip = (mount, price) => {
     const currency = mount.dataset.currency || 'USD';
@@ -69,7 +80,7 @@
           couple_room_type: '', couple_room_count: 0, couple_room_price: 0,
           child_room_type: '', child_room_count: 0, child_room_price: 0
         },
-        payment: { deposit_amount: 0, installments: 1, preselect_full_payment: false, option_label: 'I want to Deposit', show_deal_price_badge: false },
+        payment: { deposit_amount: (config.deposit || {}).amount || 0, installments: (config.deposit || {}).installments || 1, preselect_full_payment: !!(config.deposit || {}).preselectFull, option_label: 'I want to Deposit', show_deal_price_badge: false },
         info: { start_city: config.startCity || '', end_city: config.endCity || '', departure_city: config.departureCity || '', duration_label: config.durationLabel || '', date_label: config.dateLabel || '', days: 0, nights: 0 },
         traveller_types: [], package_types: (config.packageTypes || []).map(type => ({ name: type.name, value: type.name.toLowerCase(), message: type.message || '' })), tour_types: [], included: [],
         cta: { primary_label: 'Book now', secondary_label: 'Enquiry Now' },
@@ -108,6 +119,11 @@
       : [{ label: 'Traveler', qty: count, amount: price * count }];
     addonsOf(body).forEach(addon => lines.push({ label: addon.name, qty: addon.qty, amount: addon.price * addon.qty }));
     const total = lines.reduce((sum, line) => sum + line.amount, 0);
+    const deposit = depositOf(body.shopify_product_id);
+    if (deposit && body.payment_type === 'deposit') {
+      const dueNow = Math.min(Number(deposit.amount) * count, total);
+      return { lines, total, due_now: dueNow, balance: total - dueNow, payment_type: 'deposit', installments: Number(deposit.installments) || 1 };
+    }
     const later = addonsOf(body).filter(addon => !addon.variant).reduce((sum, addon) => sum + addon.price * addon.qty, 0);
     return { lines, total, due_now: total - later, balance: later, payment_type: 'full' };
   };
@@ -122,12 +138,45 @@
   };
 
   // Shopify cart link: variant x travelers. Everything else goes on the order as "Additional details".
+  const depositLookups = {};
+  const findDepositVariant = (mount, deposit) => {
+    if (/^\d{6,}$/.test(String(deposit.variant || ''))) return Promise.resolve(String(deposit.variant));
+    const handle = (mount.dataset.handle || mount.dataset.trip || '').trim();
+    const store = mount.dataset.store;
+    if (!handle || !store) return Promise.resolve('');
+    const key = `${store}/${handle}`;
+    if (!depositLookups[key]) {
+      depositLookups[key] = fetch(`https://${store}/products/${encodeURIComponent(handle)}.js`, { headers: { Accept: 'application/json' } })
+        .then(response => (response.ok ? response.json() : null))
+        .then(product => {
+          const variants = (product && product.variants) || [];
+          const cents = Math.round(Number(deposit.amount) * 100);
+          const match = variants.find(item => /deposit/i.test([item.title, item.option1, item.option2, item.option3].join(' ')))
+            || variants.find(item => Number(item.price) === cents && String(item.id) !== String(mount.dataset.variant));
+          if (!match) console.warn(`No "Deposit" variant ($${deposit.amount}) found on Shopify product ${handle}. Add one in Shopify admin.`);
+          return match ? String(match.id) : '';
+        })
+        .catch(lookupError => {
+          console.warn('Could not read the deposit variant from Shopify.', lookupError);
+          delete depositLookups[key];
+          return '';
+        });
+    }
+    return depositLookups[key];
+  };
+
   const checkout = async body => {
     const mount = mountFor(body.shopify_product_id);
     const store = mount.dataset.store;
     const variant = mount.dataset.variant;
     const count = travelerCount(body);
     const q = await quote(body);
+    const currency = mount.dataset.currency || 'USD';
+    const deposit = q.payment_type === 'deposit' ? depositOf(body.shopify_product_id) : null;
+    const depositVariant = deposit ? await findDepositVariant(mount, deposit) : '';
+    if (deposit && !depositVariant) {
+      throw new Error('Deposit payment is not available online yet. Please choose Full Price or send an enquiry. Nothing was charged.');
+    }
 
     const attributes = {
       'Trip': mount.dataset.title || '',
@@ -135,21 +184,28 @@
       'Travelers': String(count),
       ...(unitOf(body.shopify_product_id) ? { 'Couples': String(Math.ceil(count / unitOf(body.shopify_product_id).mult)) } : {}),
       'Trip total': `${q.total} ${mount.dataset.currency || 'USD'}`,
-      'Paid at checkout': `${q.due_now} ${mount.dataset.currency || 'USD'}`
+      'Payment': deposit ? 'Deposit' : 'Full payment',
+      'Paid at checkout': `${q.due_now} ${currency}`,
+      ...(deposit ? {
+        'Balance due later': `${q.balance} ${currency}`,
+        ...(q.installments > 1 ? { 'Installments': `${q.installments} x ${Math.round(q.balance / q.installments * 100) / 100} ${currency}` } : {})
+      } : {})
     };
     const extras = addonsOf(body);
     if (extras.length) attributes['Extras'] = extras.map(addon => `${addon.qty} x ${addon.name}`).join(', ');
-    if (q.balance > 0) attributes['Extras to confirm'] = `${q.balance} ${mount.dataset.currency || 'USD'} (not charged at checkout)`;
+    if (!deposit && q.balance > 0) attributes['Extras to confirm'] = `${q.balance} ${mount.dataset.currency || 'USD'} (not charged at checkout)`;
     (body.travelers || []).forEach((traveler, index) => {
       attributes[`Traveler ${index + 1}`] = [traveler.name, traveler.email, traveler.phone, traveler.type].filter(Boolean).join(' | ');
     });
 
     const params = [];
     Object.keys(attributes).forEach(key => params.push(`${encodeURIComponent(`attributes[${key}]`)}=${encodeURIComponent(attributes[key])}`));
-    params.push(`note=${encodeURIComponent(`${attributes['Trip']} | ${dateText(body)} | ${count} traveler(s)`)}`);
+    params.push(`note=${encodeURIComponent(`${attributes['Trip']} | ${dateText(body)} | ${count} traveler(s)${deposit ? ` | Deposit paid, balance ${q.balance} ${currency}` : ''}`)}`);
     if (body.contact && body.contact.email) params.push(`${encodeURIComponent('checkout[email]')}=${encodeURIComponent(body.contact.email)}`);
 
-    const items = [`${variant}:${count}`, ...extras.filter(addon => addon.variant).map(addon => `${addon.variant}:${addon.qty}`)].join(',');
+    const items = deposit
+      ? `${depositVariant}:${count}`
+      : [`${variant}:${count}`, ...extras.filter(addon => addon.variant).map(addon => `${addon.variant}:${addon.qty}`)].join(',');
     return { checkout_url: `https://${store}/cart/${items}?${params.join('&')}` };
   };
 
@@ -191,6 +247,39 @@
   const enquiry = body => postForm({ trip: trackedTrip(body.shopify_product_id), name: body.name, email: body.email, phone: body.phone || '', message: body.message || '' });
   const itinerary = body => postForm({ trip: trackedTrip(body.shopify_product_id), name: body.name, email: body.email, phone: '', message: 'Please send me the itinerary.' });
 
-  const api = { configured: true, getTrip, quote, checkout, enquiry, itinerary };
+  // One trip as a cart line: everything the cart page needs to price it and send it to Shopify checkout
+  const cartItem = (body, view = {}) => {
+    const mount = mountFor(body.shopify_product_id);
+    const config = configFor(body.shopify_product_id);
+    const deposit = depositOf(body.shopify_product_id);
+    const date = body.date_id ? (config.dates || []).find(item => item.from === String(body.date_id)) : null;
+    const chosen = addonsOf(body);
+    return {
+      productId: String(body.shopify_product_id),
+      title: mount.dataset.title || view.title || '',
+      url: view.url || location.pathname,
+      image: view.image || '',
+      store: mount.dataset.store,
+      currency: mount.dataset.currency || 'USD',
+      variant: mount.dataset.variant,
+      depositVariant: deposit && /^\d{6,}$/.test(String(deposit.variant || '')) ? String(deposit.variant) : '',
+      deposit: deposit ? { amount: Number(deposit.amount), installments: Number(deposit.installments) || 1 } : null,
+      payment: deposit && body.payment_type === 'deposit' ? 'deposit' : 'full',
+      unitPrice: priceFromPage(mount),
+      unit: unitOf(body.shopify_product_id),
+      travelers: travelerCount(body),
+      minTravelers: config.minGroup || 1,
+      step: (unitOf(body.shopify_product_id) || {}).mult || 1,
+      from: date ? date.from : (body.dates && body.dates.from) || '',
+      to: date ? date.to : (body.dates && body.dates.to) || '',
+      dateLabel: !date && !(body.dates && body.dates.from) ? config.dateLabel || '' : '',
+      startCity: config.startCity || view.startCity || '',
+      endCity: config.endCity || view.endCity || '',
+      duration: view.duration || '',
+      extras: chosen.map(addon => ({ id: addon.id, name: addon.name, qty: addon.qty, price: addon.price, variant: addon.variant || '' }))
+    };
+  };
+
+  const api = { configured: true, getTrip, quote, checkout, cartItem, enquiry, itinerary };
   window.ITAServices = Object.freeze({ config: Object.freeze({ mode: 'shopify' }), api: Object.freeze(api) });
 })();

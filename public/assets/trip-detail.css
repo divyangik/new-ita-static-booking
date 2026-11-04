@@ -214,7 +214,7 @@ body[data-page="trip"] { --forest: #071e19; --champagne: #ecdc25; --subnav-top: 
 }
 @media (max-width: 1023px) {
   .td-subnav-cta { display: none; }
-  .td-overview-grid { grid-template-columns: 1fr; }
+  .td-overview-grid { grid-template-columns: minmax(0, 1fr); }
   .td-book { position: static; }
   .td-book-card { max-width: 640px; }
   .td-day, .td-day:nth-child(even) { grid-template-columns: 1fr; }

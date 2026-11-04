@@ -222,3 +222,10 @@
 .td-book-card [data-ita-booking] + .td-book-btn { margin-top: 14px; }
 .td-book-card .td-book-contact { margin-top: 18px; line-height: 1.7; }
 .tw .tw-actions { gap: 12px; }
+/* Let the widget shrink to the card on phones */
+.tw { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.tw > * { min-width: 0; }
+.tw-dates { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.tw-field input, .tw-field select { min-width: 0; }
+.tw-row { grid-template-columns: 44px minmax(0, 1fr) auto auto; }
+@media (max-width: 380px) { .tw-dates { grid-template-columns: minmax(0, 1fr); } }

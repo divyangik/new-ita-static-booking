@@ -287,6 +287,21 @@
       travelers: [{ ...contact, type: (travelerSlots()[0] || {}).label || '' }, ...dlg.guests.map((g, i) => ({ name: g.name.trim(), email: g.email.trim(), phone: g.phone.trim(), type: (travelerSlots()[i + 1] || {}).label || '' }))]
     });
 
+    const cartMode = () => shopifyMode && !!window.ITACart && typeof api.cartItem === 'function';
+    const addToCart = () => {
+      const d = date();
+      const body = {
+        shopify_product_id: productId,
+        date_id: d ? d.id : null,
+        dates: d || labelMode ? null : { from: state.from, to: state.to },
+        addons: addons.filter(a => state.addons[a.id] > 0).map(a => ({ id: a.id, qty: state.addons[a.id] })),
+        payment_type: state.pay === 'full' ? 'full' : 'deposit',
+        travelers: Array.from({ length: travelers() }, () => ({}))
+      };
+      const item = api.cartItem(body, { title, image: heroImage, url: location.pathname, startCity, endCity, duration: durationText() });
+      window.ITACart.showAdded(window.ITACart.add(item));
+    };
+
     // ---------- the widget (inline in the page) ----------
     const stepper = (label, attrs, count, canDown, canUp) => `
       <div class="tw-step" role="group" aria-label="${esc(label)}">
@@ -349,15 +364,17 @@
           }).join('')}
         </section>` : '';
 
-      const payment = !fixedMode || shopifyMode ? '' : `
+      const showPayment = shopifyMode ? depositPer > 0 : fixedMode;
+      const payment = !showPayment ? '' : `
         <section class="tw-sec">
-          <div class="tw-sec-head"><h4>Payment</h4></div>
+          ${shopifyMode ? '' : '<div class="tw-sec-head"><h4>Payment</h4></div>'}
           <div class="tw-pay">
             ${depositPer > 0 ? `
             <label class="tw-opt ${state.pay === 'deposit' ? 'is-on' : ''}">
               <input type="radio" name="pay" value="deposit" data-fk="pay-deposit" ${state.pay === 'deposit' ? 'checked' : ''}>
               <span class="tw-opt-main"><b>${esc(T.payment.option_label || 'I want to Deposit')}</b>
-                <small>${est ? `${money(est.depositBalance, currency)} balance paid later.` : 'Balance paid later.'}${installments > 1 && est && est.depositBalance > 0 ? `<br>(You can pay it in easy installments like ${money(est.depositBalance / installments, currency)} × ${installments})` : ''}</small></span>
+                <small>${est ? `${money(est.depositBalance, currency)} balance paid later.` : 'Balance paid later.'}${installments > 1 && est && est.depositBalance > 0 ? `<br>(You can pay it in easy installments like <span style="white-space:nowrap">${money(est.depositBalance / installments, currency)} × ${installments}</span>)` : ''}</small>
+                ${depositPer > 0 ? `<small>${money(depositPer, currency)} per traveler</small>` : ''}</span>
               <span class="tw-opt-amt">${est ? money(est.depositNow, currency) : money(depositPer * n, currency)}</span>
             </label>` : ''}
             <label class="tw-opt ${state.pay === 'full' ? 'is-on' : ''}">
@@ -370,9 +387,9 @@
 
       const totalBar = bookable && est ? `
         <div class="tw-total"><span>Trip total</span><b>${money(est.total, currency)}</b></div>
-        ${shopifyMode ? '' : `<p class="tw-due">Due now: <b>${money(est.due, currency)}</b>${est.balance > 0 ? ` · Balance ${money(est.balance, currency)}` : ''}</p>`}` : '';
+        ${shopifyMode && !(depositPer > 0) ? '' : `<p class="tw-due">Due now: <b>${money(est.due, currency)}</b>${est.balance > 0 ? ` · Balance ${money(est.balance, currency)}` : ''}</p>`}` : '';
 
-      const primaryLabel = bookable ? (T.cta.primary_label || 'Book now') : 'Send enquiry';
+      const primaryLabel = bookable ? (cartMode() ? 'Add to cart' : (T.cta.primary_label || 'Book now')) : 'Send enquiry';
       const secondaryLabel = T.cta.secondary_label || 'Enquiry Now';
       return `
         <div class="tw">
@@ -490,8 +507,8 @@
         <ul class="tw-lines tw-people">${[{ name: dlg.name.trim() }, ...dlg.guests].map((g, i) => `<li><span>Traveler ${i + 1}</span><b>${esc(g.name.trim())}</b></li>`).join('')}</ul>
         <ul class="tw-lines">${q.lines.map(l => `<li><span>${esc(l.label)} × ${l.qty}</span><b>${money(num(l.amount), currency)}</b></li>`).join('')}</ul>
         <div class="tw-total"><span>Trip total</span><b>${money(num(q.total), currency)}</b></div>
-        ${shopifyMode ? '' : `<div class="tw-total due"><span>${q.payment_type === 'deposit' ? 'Deposit due now' : 'Due now'}</span><b>${money(num(q.due_now), currency)}</b></div>`}
-        ${num(q.balance) > 0 ? `<p class="tw-hint">The remaining ${money(num(q.balance), currency)} is arranged with your ITA Global specialist.</p>` : ''}
+        ${shopifyMode && q.payment_type !== 'deposit' ? '' : `<div class="tw-total due"><span>${q.payment_type === 'deposit' ? 'Deposit due now' : 'Due now'}</span><b>${money(num(q.due_now), currency)}</b></div>`}
+        ${num(q.balance) > 0 ? `<p class="tw-hint">The remaining ${money(num(q.balance), currency)} is ${q.payment_type === 'deposit' ? `paid later${num(q.installments) > 1 ? `, in easy installments like ${money(num(q.balance) / num(q.installments), currency)} × ${num(q.installments)}` : ''}. Your ITA Global specialist will arrange it with you` : 'arranged with your ITA Global specialist'}.</p>` : ''}
         ${dlg.error ? `<p class="tw-err" role="alert">${esc(dlg.error)}</p>` : ''}
         <div class="tw-actions">
           <button type="button" class="tw-btn tw-ghost" data-d-act="back" ${dlg.busy ? 'disabled' : ''}>Edit details</button>
@@ -693,6 +710,7 @@
       if (problem && action.dataset.act === 'reserve') { state.error = problem; renderWidget(); return; }
       state.error = '';
       renderWidget();
+      if (action.dataset.act === 'reserve' && cartMode()) { addToCart(); return; }
       openDialog(action.dataset.act === 'reserve' ? 'reserve' : 'enquiry');
     });
 

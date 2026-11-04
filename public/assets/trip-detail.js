@@ -43,7 +43,7 @@
     const show = next => {
       index = (next + shots.length) % shots.length;
       const shot = shots[index];
-      image.src = `/.netlify/images?url=${encodeURIComponent(shot.dataset.full)}&w=1800&q=82`;
+      image.src = shot.dataset.full;
       image.alt = select('img', shot).alt;
       caption.textContent = `${shot.dataset.caption} · ${index + 1} / ${shots.length}`;
     };

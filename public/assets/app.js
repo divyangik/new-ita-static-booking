@@ -296,7 +296,7 @@ if (faqBox && window.ITA_FAQ) {
   render();
 }
 
-/* ---------- forms (Netlify) ---------- */
+/* ---------- forms (Web3Forms) ---------- */
 $$('form[data-netlify]').forEach(f => f.addEventListener('submit', async e => {
   e.preventDefault();
   if (!f.reportValidity()) return;
@@ -307,8 +307,19 @@ $$('form[data-netlify]').forEach(f => f.addEventListener('submit', async e => {
   if (error) error.remove();
   f.setAttribute('aria-busy', 'true');
   try {
-    const response = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(new FormData(f)).toString() });
-    if (!response.ok) throw new Error('Submission unavailable');
+    const fields = Object.fromEntries(new FormData(f));
+    const formName = fields['form-name'] || 'website';
+    const honeypot = fields.bot;
+    delete fields['form-name']; delete fields.bot;
+    if (!honeypot) {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ access_key: '58439164-9998-4dda-8841-e734239117e6', subject: `New ${formName.replace(/-/g, ' ')} from itaglobal.com`, from_name: 'ITA Global website', form: formName, page: location.pathname, ...fields })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result || result.success !== true) throw new Error('Submission unavailable');
+    }
     f.classList.add('sent');
     const success = f.nextElementSibling;
     if (success) {
