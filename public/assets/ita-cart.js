@@ -41,12 +41,12 @@
       const dueNow = Math.min(num(deposit.amount) * travelers, total);
       const installments = Math.max(1, num(deposit.installments));
       return { travelers, base, extrasTotal, total, dueNow, balance: total - dueNow, payDeposit, installments, depositPer: num(deposit.amount),
-        lines: [{ variant: String(item.depositVariant), qty: travelers }] };
+        lines: [{ variant: String(item.depositVariant), gid: item.depositVariantGid || '', qty: travelers, main: true }] };
     }
     const charged = extras.filter(extra => extra.variant);
     const unpaidExtras = extras.filter(extra => !extra.variant).reduce((sum, extra) => sum + num(extra.price) * num(extra.qty), 0);
     return { travelers, base, extrasTotal, total, dueNow: total - unpaidExtras, balance: unpaidExtras, payDeposit, installments: 1, depositPer: deposit ? num(deposit.amount) : 0,
-      lines: [{ variant: String(item.variant), qty: travelers }, ...charged.map(extra => ({ variant: String(extra.variant), qty: num(extra.qty) }))] };
+      lines: [{ variant: String(item.variant), gid: item.variantGid || '', qty: travelers, main: true }, ...charged.map(extra => ({ variant: String(extra.variant), gid: extra.variantGid || '', qty: num(extra.qty), extra: extra.name }))] };
   };
 
   const totals = items => items.reduce((sum, item) => {
@@ -145,6 +145,40 @@
     return `https://${store}/cart/${path}?${params.join('&')}`;
   };
 
+  // Shopify Cart API checkout: every trip line carries its own details. Falls back to a cart link.
+  const checkout = async items => {
+    const shopify = window.ITAShopify;
+    const lines = [];
+    items.forEach(item => calc(item).lines.forEach(line => lines.push({ item, line })));
+    const ready = shopify && lines.length && lines.every(({ line }) => line.gid) && items.every(item => item.store === shopify.settings.store);
+    if (ready) {
+      try {
+        const sum = totals(items);
+        const currency = items[0].currency || 'USD';
+        const lead = guestsOf(items[0])[0];
+        return await shopify.createCheckout({
+          lines: lines.map(({ item, line }) => ({
+            merchandiseId: line.gid,
+            quantity: line.qty,
+            attributes: line.main
+              ? [...Object.entries(details(item)), ...guestsOf(item).slice(1).map((guest, index) => [`Traveler ${index + 2}`, contactText(guest)])]
+              : [['For Trip', item.title], ['Tour Dates', datesText(item)]]
+          })),
+          attributes: [
+            ['Order Total', money(sum.total, currency)],
+            ['Paid At Checkout', money(sum.dueNow, currency)],
+            ...(sum.balance > 0 ? [['Balance Due Later', money(sum.balance, currency)]] : [])
+          ],
+          note: items.map(item => `${item.title} | ${datesText(item)} | ${plural(calc(item).travelers, 'traveler')} | ${calc(item).payDeposit ? 'Deposit' : 'Full payment'}`).join('\n'),
+          email: lead ? lead.email : ''
+        });
+      } catch (cartError) {
+        console.warn('Shopify Cart API checkout failed. Using a cart link instead.', cartError);
+      }
+    }
+    return checkoutUrl(items);
+  };
+
   // ---------- public actions ----------
   const sameTrip = (a, b) => a.productId === b.productId && (a.from || '') === (b.from || '') && (a.to || '') === (b.to || '') && (a.dateLabel || '') === (b.dateLabel || '');
   const add = item => {
@@ -213,7 +247,7 @@
   window.addEventListener('storage', event => { if (event.key === STORAGE_KEY) { read(); updateBadges(); listeners.forEach(listener => listener(memory.slice())); } });
 
   window.ITACart = Object.freeze({
-    items: read, add, update, remove, clear, count, calc, totals, details, checkoutUrl, showAdded, guestsOf,
+    items: read, add, update, remove, clear, count, calc, totals, details, checkout, checkoutUrl, showAdded, guestsOf,
     onChange: listener => { listeners.add(listener); return () => listeners.delete(listener); },
     format: { money, dmy, plural, esc, datesText, routeText, travelersText, extrasText }
   });

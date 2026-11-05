@@ -231,10 +231,16 @@
       }
       if (!state.agreed) { state.error = 'Please agree to the Terms & Conditions to continue.'; render(); root.querySelector('.ic-agree input').focus(); return; }
       const stores = new Set(items.map(entry => entry.store));
-      const url = stores.size === 1 ? cart.checkoutUrl(items) : '';
-      if (!url) { state.error = 'Checkout could not be started for these journeys. Please send us an enquiry and we will help you book.'; render(); return; }
+      if (stores.size !== 1) { state.error = 'These journeys must be checked out separately for now. Please remove one, check out, then add it again.'; render(); return; }
       state.busy = true; state.error = ''; render();
-      window.location.assign(url);
+      cart.checkout(items).then(url => {
+        if (!url) throw new Error('No checkout URL');
+        window.location.assign(url);
+      }).catch(() => {
+        state.busy = false;
+        state.error = 'Checkout could not be started. Nothing was charged. Please try again or send us an enquiry.';
+        render();
+      });
     }
   });
   root.addEventListener('input', event => {
@@ -262,8 +268,47 @@
   root.addEventListener('change', event => {
     if (event.target.dataset.act === 'agree') { state.agreed = event.target.checked; if (state.agreed) state.error = ''; render(); root.querySelector('.ic-agree input').focus(); }
   });
-  window.addEventListener('pageshow', () => { state.busy = false; render(); });
+  window.addEventListener('pageshow', event => { state.busy = false; render(); if (event.persisted) refreshFromShopify(); });
+
+  const refreshFromShopify = async () => {
+    const shopify = window.ITAShopify;
+    if (!shopify) return;
+    const items = cart.items().filter(item => item.handle && item.store === shopify.settings.store);
+    await Promise.all(items.map(async item => {
+      try {
+        const live = await shopify.product(item.handle);
+        if (!live) return;
+        const extras = (item.extras || []).map(extra => {
+          const match = (live.addons || []).find(addon => addon.variant === String(extra.variant) || addon.id === String(extra.id));
+          return match ? { ...extra, name: match.name, price: match.price, variant: match.variant, variantGid: match.variantGid } : extra;
+        });
+        const deposit = live.deposit ? { amount: live.deposit.amount, installments: live.deposit.installments } : null;
+        cart.update(item.key, {
+          title: live.title || item.title,
+          image: live.image || item.image,
+          currency: live.currency || item.currency,
+          unitPrice: live.price > 0 ? live.price : item.unitPrice,
+          variant: live.variant,
+          variantGid: live.variantGid,
+          deposit,
+          depositVariant: live.deposit ? live.deposit.variant : '',
+          depositVariantGid: live.deposit ? live.deposit.variantGid : '',
+          payment: deposit ? item.payment : 'full',
+          unit: live.priceUnit || null,
+          minTravelers: live.minGroup || item.minTravelers,
+          step: (live.priceUnit && live.priceUnit.mult) || 1,
+          startCity: live.startCity,
+          endCity: live.endCity,
+          extras
+        }, { silent: true });
+      } catch (refreshError) {
+        console.warn(`Could not refresh "${item.title}" from Shopify. Showing the saved cart details.`, refreshError);
+      }
+    }));
+    render();
+  };
 
   cart.onChange(render);
   render();
+  refreshFromShopify();
 })();

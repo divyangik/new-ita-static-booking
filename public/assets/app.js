@@ -220,7 +220,7 @@ const tripPages = {
 const tripLink = t => tripPages[t.id] ? `href="${tripPages[t.id]}"` : `href="${t.url}" target="_blank" rel="noopener"`;
 const tripCard = t => `
   <a class="trip rv" ${tripLink(t)}>
-    <div class="ph"><img src="/${t.img}" alt="${t.title.replace(/"/g, '')}" loading="lazy" width="800" height="1000"><span class="badge">${t.region}</span></div>
+    <div class="ph"><img src="/${t.img}" alt="${t.title.replace(/"/g, '')}" loading="lazy" width="800" height="1000"><span class="badge">${t.country || t.region}</span></div>
     <div class="body"><small class="trip-category">${t.cat}</small>
       <h4>${t.title}</h4>
       <div class="meta"><span class="price">${t.price > 0 ? `${t.cat === 'Day Experience' ? '' : 'from '}<b>${fmt(t.price)}</b>${t.price > 400 ? ' pp' : ''}` : '<b>$X,XXX</b> pp'}</span><span class="ar" aria-hidden="true">↗</span></div>
@@ -241,17 +241,21 @@ $$('[data-rail-nav]').forEach(n => {
 });
 const grid = $('#trip-grid');
 if (grid) {
-  const st = { region: 'all', cat: new URLSearchParams(location.search).get('cat') || 'all', q: '', sort: 'featured' };
+  const params = new URLSearchParams(location.search);
+  const st = { region: 'all', country: params.get('country') || 'all', cat: params.get('cat') || 'all', q: '', sort: 'featured' };
   const mk = (box, key, vals) => {
     box.innerHTML = vals.map(v => `<button type="button" data-v="${v}" class="${st[key] === v ? 'on' : ''}" aria-pressed="${st[key] === v}">${v === 'all' ? 'All' : v}</button>`).join('');
     box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st[key] = b.dataset.v; $$('button', box).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); }); render(); });
   };
   mk($('#f-region'), 'region', ['all', 'Latin America', 'Caribbean', 'Europe', 'Asia', 'Africa']);
+  const countryBox = $('#f-country');
+  if (countryBox) mk(countryBox, 'country', ['all', ...[...new Set(ITA_TRIPS.map(t => t.country).filter(Boolean))].sort((a, b) => a.localeCompare(b))]);
   mk($('#f-cat'), 'cat', ['all', 'Group & Leisure', 'Luxuria', 'Real Estate', 'Incentive', 'Day Experience']);
   $('#f-q').addEventListener('input', e => { st.q = e.target.value.toLowerCase(); render(); });
   $('#f-sort').addEventListener('change', e => { st.sort = e.target.value; render(); });
   function render() {
-    let l = ITA_TRIPS.filter(t => (st.region === 'all' || t.region === st.region) && (st.cat === 'all' || t.cat === st.cat) && (!st.q || t.title.toLowerCase().includes(st.q)));
+    let l = ITA_TRIPS.filter(t => (st.region === 'all' || t.region === st.region) && (st.country === 'all' || t.country === st.country) && (st.cat === 'all' || t.cat === st.cat) && (!st.q || `${t.title} ${t.country || ''}`.toLowerCase().includes(st.q)));
+    if (st.sort === 'featured') l = [...l].sort((a, b) => (a.country || '').localeCompare(b.country || '') || (a.rank || 99) - (b.rank || 99));
     if (st.sort === 'low') l = [...l].sort((a, b) => a.price - b.price);
     if (st.sort === 'high') l = [...l].sort((a, b) => b.price - a.price);
     grid.innerHTML = l.map(tripCard).join('') || '<p class="muted">No journeys match — tell us what you have in mind and we will design it.</p>';

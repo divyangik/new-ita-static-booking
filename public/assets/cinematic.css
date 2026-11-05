@@ -686,3 +686,13 @@ body[data-page="calculator"] .phero { --glow-a: rgba(236,220,37,.22); }
   .motif-draw, .motif-arc { stroke-dashoffset: 0; }
   .journey-types .filters button:hover, .hub:hover { transform: none; }
 }
+/* Home: pixel globe and scrolling destination strip (as on the earlier home page) */
+.hero canvas#globe { position: absolute; right: -8vw; top: 50%; transform: translateY(-50%); width: min(980px, 78vw); height: min(980px, 78vw); z-index: 1; pointer-events: none; opacity: 0; transition: opacity 1.6s; }
+.hero canvas#globe.on { opacity: 1; }
+.marquee { background: var(--paper); border-block: 1px solid var(--line); padding: 26px 0; }
+.marquee .track { animation: mq 46s linear infinite; gap: 56px; }
+.marquee span { font-size: clamp(26px, 3.4vw, 46px); font-weight: 700; color: var(--ink); letter-spacing: -.03em; gap: 56px; }
+.marquee span:nth-child(odd) { font-weight: 400; color: var(--muted); }
+.marquee span::after { width: 12px; height: 12px; border-radius: 2px; transform: none; background: var(--c, var(--red)); }
+@media (max-width: 640px) { .marquee { padding: 20px 0; } .marquee span { font-size: 26px; gap: 40px; } .marquee .track { gap: 40px; } .hero canvas#globe { right: -30vw; width: 120vw; height: 120vw; opacity: .55; } .hero canvas#globe.on { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .marquee .track { animation: none; } }

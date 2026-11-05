@@ -31,14 +31,56 @@
       priceUnit: { label: 'couple', mult: 2 },
       addons: []
     },
-    // European Christmas (Budapest -> Prague): per person, customer picks From/To dates (same as the old site)
+    // European Christmas 2026, LIVE store (itaglobal.myshopify.com): Full payment / Deposit variants
+    '10873123569829': {
+      departureCity: 'Budapest', startCity: 'Budapest', endCity: 'Prague',
+      dates: [],
+      addons: [],
+      deposit: { amount: 1000, installments: 2, variant: '51105201029285', preselectFull: true }
+    },
+    // European Christmas (Budapest -> Prague), test store: per person, customer picks From/To dates (same as the old site)
     '15465231253800': {
       // No route box; the card shows a Departure row instead (like Boquete)
       dates: [],
       addons: []
     }
   };
-  const configFor = productId => tripConfigs[productId] || { dates: [], addons: [] };
+  const liveConfigs = {};
+  const configFor = productId => liveConfigs[productId] || tripConfigs[productId] || { dates: [], addons: [] };
+
+  const showDeparture = city => {
+    if (!city) return;
+    const row = [...document.querySelectorAll('.td-book-list li')].find(li => /^departure$/i.test(((li.querySelector('span') || {}).textContent || '').trim()));
+    const value = row && row.querySelector('b');
+    if (value) value.textContent = city;
+  };
+
+  const loadLive = async mount => {
+    const shopify = window.ITAShopify;
+    const named = (mount.dataset.handle || mount.dataset.trip || '').trim();
+    const handles = [...new Set([mount.dataset.handle, mount.dataset.trip, (mount.dataset.trip || '').replace(/-\d+$/, '')].map(value => (value || '').trim()).filter(Boolean))];
+    if (!shopify || !handles.length) return false;
+    if (mount.dataset.store && mount.dataset.store !== shopify.settings.store) return false;
+    try {
+      let live = null;
+      for (const handle of handles) {
+        live = await shopify.product(handle);
+        if (live) break;
+      }
+      if (!live) { console.warn(`Shopify product "${named}" was not found on the Headless channel (tried: ${handles.join(', ')}). Using the built-in trip data.`); return false; }
+      liveConfigs[mount.dataset.productId] = live;
+      mount.dataset.store = live.store;
+      mount.dataset.variant = live.variant;
+      mount.dataset.currency = live.currency;
+      if (live.title) mount.dataset.title = live.title;
+      if (live.price > 0) mount.dataset.unitPrice = String(live.price);
+      showDeparture(live.departureCity);
+      return true;
+    } catch (liveError) {
+      console.warn('Could not load live trip data from Shopify. Using the built-in trip data.', liveError);
+      return false;
+    }
+  };
   const activeAddons = config => config.addons || [];
 
   // Per-person price, read once from the page and kept on the mount
@@ -53,7 +95,7 @@
   const unitOf = productId => configFor(productId).priceUnit || null;
   const depositOf = productId => {
     const deposit = configFor(productId).deposit;
-    return deposit && Number(deposit.amount) > 0 ? deposit : null;
+    return deposit && Number(deposit.amount) > 0 && (/^\d{6,}$/.test(String(deposit.variant || '')) || deposit.variantGid) ? deposit : null;
   };
 
   const emptyTrip = (mount, price) => {
@@ -91,6 +133,7 @@
 
   const getTrip = async productId => {
     const mount = mountFor(productId);
+    if (mount) await loadLive(mount);
     const price = priceFromPage(mount);
     if (!mount || !mount.dataset.store || !/^\d{6,}$/.test(mount.dataset.variant || '') || !price) {
       const error = new Error('Booking is not set up for this trip yet.');
@@ -256,13 +299,16 @@
     const chosen = addonsOf(body);
     return {
       productId: String(body.shopify_product_id),
+      handle: config.handle || (mount.dataset.handle || mount.dataset.trip || '').trim(),
       title: mount.dataset.title || view.title || '',
       url: view.url || location.pathname,
-      image: view.image || '',
+      image: config.image || view.image || '',
       store: mount.dataset.store,
       currency: mount.dataset.currency || 'USD',
       variant: mount.dataset.variant,
+      variantGid: config.variantGid || '',
       depositVariant: deposit && /^\d{6,}$/.test(String(deposit.variant || '')) ? String(deposit.variant) : '',
+      depositVariantGid: deposit && deposit.variantGid ? deposit.variantGid : '',
       deposit: deposit ? { amount: Number(deposit.amount), installments: Number(deposit.installments) || 1 } : null,
       payment: deposit && body.payment_type === 'deposit' ? 'deposit' : 'full',
       unitPrice: priceFromPage(mount),
@@ -276,7 +322,7 @@
       startCity: config.startCity || view.startCity || '',
       endCity: config.endCity || view.endCity || '',
       duration: view.duration || '',
-      extras: chosen.map(addon => ({ id: addon.id, name: addon.name, qty: addon.qty, price: addon.price, variant: addon.variant || '' }))
+      extras: chosen.map(addon => ({ id: addon.id, name: addon.name, qty: addon.qty, price: addon.price, variant: addon.variant || '', variantGid: addon.variantGid || '' }))
     };
   };
 
